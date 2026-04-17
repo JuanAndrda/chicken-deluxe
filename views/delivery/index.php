@@ -59,12 +59,18 @@
                     <div class="pos-product-grid" id="posProductGrid">
                         <?php foreach ($products as $category => $items): ?>
                             <?php foreach ($items as $product): ?>
+                                <?php $imgUrl = ProductModel::getProductImagePath($product['Name']); ?>
                                 <button type="button" class="pos-product-card"
                                         data-id="<?= $product['Product_ID'] ?>"
                                         data-name="<?= htmlspecialchars($product['Name']) ?>"
                                         data-price="<?= $product['Price'] ?>"
                                         data-unit="<?= htmlspecialchars($product['Unit']) ?>"
+                                        data-image="<?= htmlspecialchars($imgUrl) ?>"
                                         data-category="<?= htmlspecialchars($category) ?>">
+                                    <img class="pos-product-img"
+                                         src="<?= htmlspecialchars($imgUrl) ?>"
+                                         alt="<?= htmlspecialchars($product['Name']) ?>"
+                                         loading="lazy">
                                     <span class="pos-product-name"><?= htmlspecialchars($product['Name']) ?></span>
                                     <span class="pos-product-price">P<?= number_format($product['Price'], 2) ?></span>
                                     <span class="pos-product-unit"><?= htmlspecialchars($product['Unit']) ?></span>
@@ -84,11 +90,15 @@
                         <input type="hidden" name="product_id" id="posProductId" value="">
 
                         <div class="pos-selected-info">
-                            <div class="pos-selected-name" id="posSelectedName">—</div>
-                            <div class="pos-selected-detail">
-                                <span>Category: <strong id="posSelectedCategory">—</strong></span>
-                                <span>Unit: <strong id="posSelectedUnit">—</strong></span>
-                                <span>Price: <strong id="posSelectedPrice">P0.00</strong></span>
+                            <img id="posSelectedImg" class="pos-selected-img"
+                                 src="" alt="" style="display:none;">
+                            <div class="pos-selected-text">
+                                <div class="pos-selected-name" id="posSelectedName">—</div>
+                                <div class="pos-selected-detail">
+                                    <span>Category: <strong id="posSelectedCategory">—</strong></span>
+                                    <span>Unit: <strong id="posSelectedUnit">—</strong></span>
+                                    <span>Price: <strong id="posSelectedPrice">P0.00</strong></span>
+                                </div>
                             </div>
                         </div>
 
@@ -202,6 +212,7 @@
     const catEl = document.getElementById('posSelectedCategory');
     const priceEl = document.getElementById('posSelectedPrice');
     const unitEl = document.getElementById('posSelectedUnit');
+    const imgEl = document.getElementById('posSelectedImg');
     const qtyInput = document.getElementById('quantity');
 
     // Product card click
@@ -221,6 +232,11 @@
         catEl.textContent = p.Category_Name;
         priceEl.textContent = 'P' + parseFloat(p.Price).toFixed(2);
         unitEl.textContent = p.Unit;
+        if (imgEl && p.Image) {
+            imgEl.src = p.Image;
+            imgEl.alt = p.Name;
+            imgEl.style.display = '';
+        }
         qtyInput.value = 1;
         entryCard.style.display = 'block';
         qtyInput.focus();

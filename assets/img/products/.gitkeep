@@ -1,0 +1,12 @@
+# Product images folder
+#
+# Naming convention: lowercase product name with spaces replaced by hyphens, .jpg extension.
+# Examples:
+#   "Classic Burger"  -> classic-burger.jpg
+#   "Chicken Breast"  -> chicken-breast.jpg
+#   "Coca-Cola"       -> coca-cola.jpg
+#
+# When a matching file exists here, the POS pages automatically pick it up.
+# Otherwise they fall back to a named placeholder image (no code changes needed).
+#
+# See ProductModel::getProductImagePath() for the exact slug rule.

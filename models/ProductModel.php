@@ -50,9 +50,42 @@ class ProductModel extends Model
                 'Category_Name' => $p['Category_Name'],
                 'Unit'          => $p['Unit'],
                 'Price'         => (float) $p['Price'],
+                'Image'         => self::getProductImagePath($p['Name']),
             ];
         }
         return $map;
+    }
+
+    /**
+     * Resolve the image URL for a product by name.
+     *
+     * Looks for a matching jpg under assets/img/products/ using the slug rule:
+     *   lowercase, non-alphanumeric sequences collapsed to hyphens, trimmed.
+     * Example: "Chicken Breast" -> assets/img/products/chicken-breast.jpg
+     *
+     * If the file exists, returns its public URL. Otherwise returns a
+     * placehold.co URL that displays the product name as a fallback.
+     *
+     * Drop a correctly-named jpg into assets/img/products/ and the POS
+     * pages pick it up automatically — no code changes needed.
+     */
+    public static function getProductImagePath(string $productName): string
+    {
+        $slug = strtolower($productName);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        $slug = trim($slug, '-');
+
+        if ($slug !== '') {
+            $relative = "assets/img/products/{$slug}.jpg";
+            $absolute = __DIR__ . '/../' . $relative;
+            if (file_exists($absolute)) {
+                return BASE_URL . '/' . $relative;
+            }
+        }
+
+        // Fallback placeholder shows the product name so empty catalog
+        // entries are still identifiable on the POS grid.
+        return 'https://placehold.co/200x200?text=' . rawurlencode($productName);
     }
 
     /** Find a product by ID */
