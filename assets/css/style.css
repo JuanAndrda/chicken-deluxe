@@ -798,3 +798,68 @@ tr:hover {
     background: #e0e7ff;
     color: #3730a3;
 }
+
+/* ======================================================
+   Admin — Products photo column
+   ====================================================== */
+.products-photo-cell {
+    min-width: 180px;
+}
+.products-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border, #e5e7eb);
+    background: #f9fafb;
+    display: block;
+    margin-bottom: 6px;
+}
+.products-photo-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.products-photo-controls input[type="file"] {
+    font-size: 11px;
+    padding: 2px;
+    max-width: 160px;
+}
+.products-remove-label {
+    font-size: 11px;
+    color: var(--text-light, #6b7280);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+.form-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-light, #6b7280);
+    margin-top: 2px;
+}
+
+/* Per-product edit/toggle <form>s live between the Add card and the table;
+   collapse them so they don't inflate vertical spacing. */
+.admin-products > form[id^="edit-"],
+.admin-products > form[id^="toggle-"] {
+    display: contents;
+}
+
+/* Pagination controls */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 12px 0 4px;
+}
+.pagination-info {
+    font-size: 13px;
+    color: var(--text-light, #6b7280);
+}
+.pagination button[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

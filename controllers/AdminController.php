@@ -174,6 +174,13 @@ class AdminController extends Controller
         $product_id = $this->productModel->create($category_id, $name, $unit, $price);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Created product: {$name} (ID:{$product_id})");
 
+        // Optional photo upload
+        $photoError = $this->handlePhotoUpload($name, 'photo');
+        if ($photoError !== null) {
+            $this->redirect('/admin/products?error=' . urlencode('Product added, but photo upload failed: ' . $photoError));
+            return;
+        }
+
         $this->redirect('/admin/products?success=Product+added+successfully');
     }
 
@@ -197,7 +204,108 @@ class AdminController extends Controller
         $this->productModel->update($product_id, $category_id, $name, $unit, $price, $active);
         $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Updated product ID:{$product_id}");
 
+        // Remove-photo checkbox takes precedence over upload
+        $remove = (bool) $this->post('remove_photo', 0);
+        if ($remove) {
+            $this->deleteProductPhotos($name);
+        } else {
+            $photoError = $this->handlePhotoUpload($name, 'photo');
+            if ($photoError !== null) {
+                $this->redirect('/admin/products?error=' . urlencode('Product updated, but photo upload failed: ' . $photoError));
+                return;
+            }
+        }
+
         $this->redirect('/admin/products?success=Product+updated');
+    }
+
+    /**
+     * Handle a product photo upload from $_FILES[$field].
+     * Returns null on success (or when no file was uploaded), or a short error string.
+     * Saves to assets/img/products/{slug}.{ext} using the same slug rule as
+     * ProductModel::getProductImagePath() so the resolver picks it up automatically.
+     */
+    private function handlePhotoUpload(string $productName, string $field): ?string
+    {
+        if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null; // nothing uploaded
+        }
+
+        $f = $_FILES[$field];
+        if ($f['error'] !== UPLOAD_ERR_OK) {
+            return 'upload error code ' . $f['error'];
+        }
+        if ($f['size'] > 2 * 1024 * 1024) {
+            return 'file too large (max 2MB)';
+        }
+
+        // Validate actual image content (not just extension)
+        $info = @getimagesize($f['tmp_name']);
+        if ($info === false) {
+            return 'not a valid image';
+        }
+        $mimeToExt = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+        ];
+        if (!isset($mimeToExt[$info['mime']])) {
+            return 'unsupported image type (use JPG, PNG, or WEBP)';
+        }
+        $ext = $mimeToExt[$info['mime']];
+
+        $slug = $this->productSlug($productName);
+        if ($slug === '') {
+            return 'cannot derive filename from product name';
+        }
+
+        $dir = __DIR__ . '/../assets/img/products/';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        // Remove any other-extension variants so the resolver only finds the new one
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $oldExt) {
+            $old = $dir . $slug . '.' . $oldExt;
+            if (is_file($old)) {
+                @unlink($old);
+            }
+        }
+
+        $dest = $dir . $slug . '.' . $ext;
+        if (!move_uploaded_file($f['tmp_name'], $dest)) {
+            return 'failed to save file';
+        }
+
+        $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Uploaded photo for product: {$productName}");
+        return null;
+    }
+
+    /** Delete any slug-matching photos for a product (used by the Remove photo checkbox). */
+    private function deleteProductPhotos(string $productName): void
+    {
+        $slug = $this->productSlug($productName);
+        if ($slug === '') return;
+        $dir = __DIR__ . '/../assets/img/products/';
+        $removed = false;
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+            $path = $dir . $slug . '.' . $ext;
+            if (is_file($path)) {
+                @unlink($path);
+                $removed = true;
+            }
+        }
+        if ($removed) {
+            $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Removed photo for product: {$productName}");
+        }
+    }
+
+    /** Product-name -> slug (mirrors ProductModel::getProductImagePath slug rule). */
+    private function productSlug(string $name): string
+    {
+        $slug = strtolower($name);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        return trim($slug, '-');
     }
 
     // ============================
