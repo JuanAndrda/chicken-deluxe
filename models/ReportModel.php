@@ -1,0 +1,211 @@
+<?php
+/**
+ * ReportModel — handles all reporting queries (read-only from Slave)
+ */
+class ReportModel extends Model
+{
+    /** Daily summary for a single kiosk on a specific date */
+    public function getDailySummary(string $date, int $outlet_id): array
+    {
+        // Beginning stock
+        $beginning = $this->db->read(
+            "SELECT i.Product_ID, p.Name AS Product_Name, c.Name AS Category_Name, p.Unit,
+                    i.Quantity AS Beginning_Qty
+             FROM Inventory_Snapshot i
+             JOIN Product p ON i.Product_ID = p.Product_ID
+             JOIN Category c ON p.Category_ID = c.Category_ID
+             WHERE i.Outlet_ID = ? AND i.Snapshot_date = ? AND i.Snapshot_type = 'beginning'
+             ORDER BY c.Name, p.Name",
+            [$outlet_id, $date]
+        );
+
+        // Ending stock
+        $ending = $this->db->read(
+            "SELECT Product_ID, Quantity AS Ending_Qty
+             FROM Inventory_Snapshot
+             WHERE Outlet_ID = ? AND Snapshot_date = ? AND Snapshot_type = 'ending'",
+            [$outlet_id, $date]
+        );
+        $ending_map = [];
+        foreach ($ending as $e) {
+            $ending_map[$e['Product_ID']] = $e['Ending_Qty'];
+        }
+
+        // Deliveries
+        $deliveries = $this->db->read(
+            "SELECT Product_ID, SUM(Quantity) AS Delivered_Qty
+             FROM Delivery
+             WHERE Outlet_ID = ? AND Delivery_Date = ?
+             GROUP BY Product_ID",
+            [$outlet_id, $date]
+        );
+        $delivery_map = [];
+        foreach ($deliveries as $d) {
+            $delivery_map[$d['Product_ID']] = $d['Delivered_Qty'];
+        }
+
+        // Sales
+        $sales = $this->db->read(
+            "SELECT Product_ID, SUM(Quantity_sold) AS Sold_Qty, SUM(Line_total) AS Sales_Total
+             FROM Sales
+             WHERE Outlet_ID = ? AND Sales_date = ?
+             GROUP BY Product_ID",
+            [$outlet_id, $date]
+        );
+        $sales_map = [];
+        foreach ($sales as $s) {
+            $sales_map[$s['Product_ID']] = $s;
+        }
+
+        // Combine into a single report
+        $report = [];
+        foreach ($beginning as $row) {
+            $pid = $row['Product_ID'];
+            $beg = (int) $row['Beginning_Qty'];
+            $del = (int) ($delivery_map[$pid] ?? 0);
+            $sold = (int) ($sales_map[$pid]['Sold_Qty'] ?? 0);
+            $end = (int) ($ending_map[$pid] ?? 0);
+            $expected = $beg + $del - $sold;
+            $discrepancy = $end - $expected;
+
+            $report[] = [
+                'Product_Name'  => $row['Product_Name'],
+                'Category_Name' => $row['Category_Name'],
+                'Unit'          => $row['Unit'],
+                'Beginning_Qty' => $beg,
+                'Delivered_Qty' => $del,
+                'Sold_Qty'      => $sold,
+                'Sales_Total'   => (float) ($sales_map[$pid]['Sales_Total'] ?? 0),
+                'Ending_Qty'    => $end,
+                'Expected_Qty'  => $expected,
+                'Discrepancy'   => $discrepancy,
+            ];
+        }
+
+        return $report;
+    }
+
+    /** Get sales totals per kiosk for a date range */
+    public function getSalesTotalsByKiosk(string $from_date, string $to_date): array
+    {
+        return $this->db->read(
+            "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
+                    COUNT(s.Sales_ID) AS Total_Transactions,
+                    COALESCE(SUM(s.Line_total), 0) AS Total_Sales
+             FROM Kiosk k
+             LEFT JOIN Sales s ON k.Kiosk_ID = s.Outlet_ID
+                AND s.Sales_date BETWEEN ? AND ?
+             WHERE k.Active = 1
+             GROUP BY k.Kiosk_ID, k.Name
+             ORDER BY k.Kiosk_ID",
+            [$from_date, $to_date]
+        );
+    }
+
+    /** Get expense totals per kiosk for a date range */
+    public function getExpenseTotalsByKiosk(string $from_date, string $to_date): array
+    {
+        return $this->db->read(
+            "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
+                    COUNT(e.Expense_ID) AS Total_Entries,
+                    COALESCE(SUM(e.Amount), 0) AS Total_Expenses
+             FROM Kiosk k
+             LEFT JOIN Expenses e ON k.Kiosk_ID = e.Outlet_ID
+                AND e.Expense_date BETWEEN ? AND ?
+             WHERE k.Active = 1
+             GROUP BY k.Kiosk_ID, k.Name
+             ORDER BY k.Kiosk_ID",
+            [$from_date, $to_date]
+        );
+    }
+
+    /** Get daily sales breakdown for a date range and optional kiosk */
+    public function getDailySalesBreakdown(string $from_date, string $to_date, ?int $outlet_id = null): array
+    {
+        $sql = "SELECT s.Sales_date, k.Name AS Kiosk_Name,
+                       SUM(s.Line_total) AS Day_Total,
+                       COUNT(s.Sales_ID) AS Transactions
+                FROM Sales s
+                JOIN Kiosk k ON s.Outlet_ID = k.Kiosk_ID
+                WHERE s.Sales_date BETWEEN ? AND ?";
+        $params = [$from_date, $to_date];
+
+        if ($outlet_id !== null) {
+            $sql .= " AND s.Outlet_ID = ?";
+            $params[] = $outlet_id;
+        }
+
+        $sql .= " GROUP BY s.Sales_date, s.Outlet_ID
+                   ORDER BY s.Sales_date DESC, k.Name";
+
+        return $this->db->read($sql, $params);
+    }
+
+    /** Get daily expense breakdown for a date range and optional kiosk */
+    public function getDailyExpenseBreakdown(string $from_date, string $to_date, ?int $outlet_id = null): array
+    {
+        $sql = "SELECT e.Expense_date, k.Name AS Kiosk_Name,
+                       SUM(e.Amount) AS Day_Total,
+                       COUNT(e.Expense_ID) AS Entries
+                FROM Expenses e
+                JOIN Kiosk k ON e.Outlet_ID = k.Kiosk_ID
+                WHERE e.Expense_date BETWEEN ? AND ?";
+        $params = [$from_date, $to_date];
+
+        if ($outlet_id !== null) {
+            $sql .= " AND e.Outlet_ID = ?";
+            $params[] = $outlet_id;
+        }
+
+        $sql .= " GROUP BY e.Expense_date, e.Outlet_ID
+                   ORDER BY e.Expense_date DESC, k.Name";
+
+        return $this->db->read($sql, $params);
+    }
+
+    /** Get delivery summary for a date range and optional kiosk */
+    public function getDeliverySummary(string $from_date, string $to_date, ?int $outlet_id = null): array
+    {
+        $sql = "SELECT d.Delivery_Date, k.Name AS Kiosk_Name,
+                       p.Name AS Product_Name, c.Name AS Category_Name,
+                       SUM(d.Quantity) AS Total_Qty
+                FROM Delivery d
+                JOIN Kiosk k ON d.Outlet_ID = k.Kiosk_ID
+                JOIN Product p ON d.Product_ID = p.Product_ID
+                JOIN Category c ON p.Category_ID = c.Category_ID
+                WHERE d.Delivery_Date BETWEEN ? AND ?";
+        $params = [$from_date, $to_date];
+
+        if ($outlet_id !== null) {
+            $sql .= " AND d.Outlet_ID = ?";
+            $params[] = $outlet_id;
+        }
+
+        $sql .= " GROUP BY d.Delivery_Date, d.Outlet_ID, d.Product_ID
+                   ORDER BY d.Delivery_Date DESC, k.Name, c.Name, p.Name";
+
+        return $this->db->read($sql, $params);
+    }
+
+    /** Get dates with missing beginning or ending snapshots (anomalies) */
+    public function getMissingSnapshots(string $from_date, string $to_date): array
+    {
+        return $this->db->read(
+            "SELECT k.Name AS Kiosk_Name, i.Snapshot_date,
+                    SUM(CASE WHEN i.Snapshot_type = 'beginning' THEN 1 ELSE 0 END) AS has_beginning,
+                    SUM(CASE WHEN i.Snapshot_type = 'ending' THEN 1 ELSE 0 END) AS has_ending
+             FROM Kiosk k
+             CROSS JOIN (
+                 SELECT DISTINCT Snapshot_date FROM Inventory_Snapshot
+                 WHERE Snapshot_date BETWEEN ? AND ?
+             ) dates
+             LEFT JOIN Inventory_Snapshot i ON k.Kiosk_ID = i.Outlet_ID
+                AND i.Snapshot_date = dates.Snapshot_date
+             WHERE k.Active = 1
+             GROUP BY k.Kiosk_ID, dates.Snapshot_date
+             HAVING has_beginning = 0 OR has_ending = 0
+             ORDER BY dates.Snapshot_date DESC, k.Name",
+            [$from_date, $to_date]
+        );
+    }
+}
