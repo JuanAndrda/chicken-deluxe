@@ -9,10 +9,10 @@
     <div class="card form-card">
         <form method="GET" action="<?= BASE_URL ?>/reports/daily" class="form-inline-row">
             <div class="form-group">
-                <label for="outlet_id">Kiosk</label>
-                <select id="outlet_id" name="outlet_id" class="form-select" onchange="this.form.submit()">
+                <label for="kiosk_id">Kiosk</label>
+                <select id="kiosk_id" name="kiosk_id" class="form-select" onchange="this.form.submit()">
                     <?php foreach ($kiosks as $k): ?>
-                        <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $outlet_id ? 'selected' : '' ?>>
+                        <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $kiosk_id ? 'selected' : '' ?>>
                             <?= htmlspecialchars($k['Name']) ?>
                         </option>
                     <?php endforeach; ?>

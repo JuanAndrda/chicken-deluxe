@@ -111,19 +111,19 @@ chicken-deluxe/
 // ✅ DO: Use classes for everything — OOP all the way
 class InventoryModel extends Model {
     // Properties at the top
-    private int $outlet_id;
+    private int $kiosk_id;
 
     // Constructor next
-    public function __construct(int $outlet_id) {
+    public function __construct(int $kiosk_id) {
         parent::__construct();
-        $this->outlet_id = $outlet_id;
+        $this->kiosk_id = $kiosk_id;
     }
 
     // Public methods first, private/protected last
     public function getTodaySnapshot(): array {
         // Short, descriptive variable names
-        $query = "SELECT * FROM Inventory_Snapshot WHERE Outlet_ID = ?";
-        return $this->db->readQuery($query, [$this->outlet_id]);
+        $query = "SELECT * FROM Inventory_Snapshot WHERE Kiosk_ID = ?";
+        return $this->db->readQuery($query, [$this->kiosk_id]);
     }
 }
 ```
@@ -136,10 +136,10 @@ class InventoryModel extends Model {
 - **Comment every method** with a one-line description of what it does
 - **Consistent naming:**
   - Classes → `PascalCase` (e.g. `InventoryModel`)
-  - Methods/functions → `camelCase` (e.g. `getByOutlet()`)
-  - Variables → `snake_case` (e.g. `$outlet_id`)
+  - Methods/functions → `camelCase` (e.g. `getByKiosk()`)
+  - Variables → `snake_case` (e.g. `$kiosk_id`)
   - Constants → `UPPER_SNAKE_CASE` (e.g. `ROLE_OWNER`)
-  - DB columns → match the schema exactly (e.g. `Outlet_ID`, `Locked_status`)
+  - DB columns → match the schema exactly (e.g. `Kiosk_ID`, `Locked_status`)
 
 ### HTML/CSS
 - Use semantic HTML (`<section>`, `<article>`, `<nav>`, `<main>`, etc.)
@@ -227,7 +227,7 @@ These rules ensure Juan can easily add features, change logic, or update require
 3. **Small, single-purpose methods** — one method does one thing
    ```php
    // ✅ Good: easy to reuse and test
-   public function getByOutlet(int $outlet_id): array { ... }
+   public function getByKiosk(int $kiosk_id): array { ... }
    public function getByDate(string $date): array { ... }
    public function lockRecord(int $id): bool { ... }
 
@@ -240,7 +240,7 @@ These rules ensure Juan can easily add features, change logic, or update require
 5. **Views receive data as arrays** — controllers prepare data, views just render it
    ```php
    // Controller
-   $data['inventory'] = $inventoryModel->getTodaySnapshot($outlet_id);
+   $data['inventory'] = $inventoryModel->getTodaySnapshot($kiosk_id);
    $this->render('inventory/index', $data);
 
    // View

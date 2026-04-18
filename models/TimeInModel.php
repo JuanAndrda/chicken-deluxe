@@ -5,11 +5,11 @@
 class TimeInModel extends Model
 {
     /** Record a time-in for a user */
-    public function recordTimeIn(int $user_id, int $outlet_id): int
+    public function recordTimeIn(int $user_id, int $kiosk_id): int
     {
         return $this->db->insert(
-            "INSERT INTO Time_in (User_ID, Outlet_ID) VALUES (?, ?)",
-            [$user_id, $outlet_id]
+            "INSERT INTO Time_in (User_ID, Kiosk_ID) VALUES (?, ?)",
+            [$user_id, $kiosk_id]
         );
     }
 
@@ -24,19 +24,19 @@ class TimeInModel extends Model
         return ($row['cnt'] ?? 0) > 0;
     }
 
-    /** Get time-in records for a date range, optional outlet filter */
-    public function getByDateRange(string $from_date, string $to_date, ?int $outlet_id = null): array
+    /** Get time-in records for a date range, optional kiosk filter */
+    public function getByDateRange(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
         $sql = "SELECT t.*, u.Full_name, u.Username, k.Name AS Kiosk_Name
                 FROM Time_in t
                 JOIN User u ON t.User_ID = u.User_ID
-                JOIN Kiosk k ON t.Outlet_ID = k.Kiosk_ID
+                JOIN Kiosk k ON t.Kiosk_ID = k.Kiosk_ID
                 WHERE DATE(t.Timestamp) BETWEEN ? AND ?";
         $params = [$from_date, $to_date];
 
-        if ($outlet_id !== null) {
-            $sql .= " AND t.Outlet_ID = ?";
-            $params[] = $outlet_id;
+        if ($kiosk_id !== null) {
+            $sql .= " AND t.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
         }
 
         $sql .= " ORDER BY t.Timestamp DESC";

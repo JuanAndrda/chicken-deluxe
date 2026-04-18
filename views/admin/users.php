@@ -42,8 +42,8 @@
             </div>
 
             <div class="form-group">
-                <label for="outlet_id">Assigned Kiosk</label>
-                <select id="outlet_id" name="outlet_id" class="form-select">
+                <label for="kiosk_id">Assigned Kiosk</label>
+                <select id="kiosk_id" name="kiosk_id" class="form-select">
                     <option value="">None (Owner/Auditor)</option>
                     <?php foreach ($kiosks as $kiosk): ?>
                         <option value="<?= $kiosk['Kiosk_ID'] ?>"><?= htmlspecialchars($kiosk['Name']) ?></option>

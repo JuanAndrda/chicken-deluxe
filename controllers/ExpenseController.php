@@ -24,12 +24,12 @@ class ExpenseController extends Controller
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
 
-        $outlet_id = $this->resolveOutlet();
-        $kiosk     = $this->kioskModel->findById($outlet_id);
+        $kiosk_id = $this->resolveKiosk();
+        $kiosk     = $this->kioskModel->findById($kiosk_id);
         $date      = $this->get('date', date('Y-m-d'));
 
-        $expenses  = $this->expenseModel->getByDateAndOutlet($date, $outlet_id);
-        $day_total = $this->expenseModel->getDailyTotal($date, $outlet_id);
+        $expenses  = $this->expenseModel->getByDateAndKiosk($date, $kiosk_id);
+        $day_total = $this->expenseModel->getDailyTotal($date, $kiosk_id);
         $is_today  = ($date === date('Y-m-d'));
         $any_locked = false;
         foreach ($expenses as $e) {
@@ -39,14 +39,14 @@ class ExpenseController extends Controller
         $data = [
             'page_title'  => 'Expenses',
             'kiosk'       => $kiosk,
-            'outlet_id'   => $outlet_id,
+            'kiosk_id'   => $kiosk_id,
             'date'        => $date,
             'expenses'    => $expenses,
             'day_total'   => $day_total,
             'is_today'    => $is_today,
             'any_locked'  => $any_locked,
             'kiosks'      => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'     => $this->expenseModel->getRecordedDates($outlet_id),
+            'history'     => $this->expenseModel->getRecordedDates($kiosk_id),
             'success'     => $_GET['success'] ?? null,
             'error'       => $_GET['error'] ?? null,
         ];
@@ -64,7 +64,7 @@ class ExpenseController extends Controller
             return;
         }
 
-        $outlet_id   = $this->resolveOutlet();
+        $kiosk_id   = $this->resolveKiosk();
         $amount      = (float) $this->post('amount');
         $description = trim($this->post('description', ''));
         $date        = $this->post('date', date('Y-m-d'));
@@ -74,7 +74,7 @@ class ExpenseController extends Controller
             return;
         }
 
-        $expense_id = $this->expenseModel->create($outlet_id, Auth::userId(), $date, $amount, $description);
+        $expense_id = $this->expenseModel->create($kiosk_id, Auth::userId(), $date, $amount, $description);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Expense ID:{$expense_id} — amount:{$amount}, desc:{$description}");
 
         $this->redirect("/expenses?date={$date}&success=Expense+recorded");
@@ -90,11 +90,11 @@ class ExpenseController extends Controller
             return;
         }
 
-        $outlet_id = $this->resolveOutlet();
+        $kiosk_id = $this->resolveKiosk();
         $date      = $this->post('date', date('Y-m-d'));
 
-        $count = $this->expenseModel->lockByDate($outlet_id, $date);
-        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} expenses for outlet:{$outlet_id} on {$date}");
+        $count = $this->expenseModel->lockByDate($kiosk_id, $date);
+        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} expenses for kiosk:{$kiosk_id} on {$date}");
 
         $this->redirect("/expenses?date={$date}&success=Expenses+locked+({$count}+records)");
     }
@@ -140,13 +140,13 @@ class ExpenseController extends Controller
         }
     }
 
-    /** Determine which outlet to use */
-    private function resolveOutlet(): int
+    /** Determine which kiosk to use */
+    private function resolveKiosk(): int
     {
         if (Auth::isStaff()) {
-            return Auth::outletId();
+            return Auth::kioskId();
         }
-        $selected = $this->get('outlet_id', $this->post('outlet_id'));
+        $selected = $this->get('kiosk_id', $this->post('kiosk_id'));
         if ($selected) {
             return (int) $selected;
         }

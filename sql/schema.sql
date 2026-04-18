@@ -25,7 +25,7 @@ INSERT INTO Role (Role_ID, Name) VALUES
 ON DUPLICATE KEY UPDATE Name = VALUES(Name);
 
 -- ==================
--- 2. Kiosk (Outlet)
+-- 2. Kiosk (Kiosk)
 -- ==================
 CREATE TABLE IF NOT EXISTS Kiosk (
     Kiosk_ID    INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,14 +50,14 @@ ON DUPLICATE KEY UPDATE Name = VALUES(Name), Location = VALUES(Location);
 CREATE TABLE IF NOT EXISTS User (
     User_ID       INT AUTO_INCREMENT PRIMARY KEY,
     Role_ID       INT NOT NULL,
-    Outlet_ID     INT NULL,
+    Kiosk_ID     INT NULL,
     Username      VARCHAR(50) NOT NULL UNIQUE,
     Password      VARCHAR(255) NOT NULL,
     Full_name     VARCHAR(100) NOT NULL,
     Active_status TINYINT(1) NOT NULL DEFAULT 1,
     Created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (Role_ID)   REFERENCES Role(Role_ID),
-    FOREIGN KEY (Outlet_ID) REFERENCES Kiosk(Kiosk_ID)
+    FOREIGN KEY (Kiosk_ID) REFERENCES Kiosk(Kiosk_ID)
 ) ENGINE=InnoDB;
 
 -- ==================
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS Product (
 -- ==================
 CREATE TABLE IF NOT EXISTS Inventory_Snapshot (
     Inventory_ID   INT AUTO_INCREMENT PRIMARY KEY,
-    Outlet_ID      INT NOT NULL,
+    Kiosk_ID      INT NOT NULL,
     Product_ID     INT NOT NULL,
     User_ID        INT NOT NULL,
     Locked_status  TINYINT(1) NOT NULL DEFAULT 0,
@@ -106,10 +106,10 @@ CREATE TABLE IF NOT EXISTS Inventory_Snapshot (
     Snapshot_type  ENUM('beginning', 'ending') NOT NULL,
     Quantity       INT NOT NULL DEFAULT 0,
     Recorded_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (Outlet_ID)  REFERENCES Kiosk(Kiosk_ID),
+    FOREIGN KEY (Kiosk_ID)  REFERENCES Kiosk(Kiosk_ID),
     FOREIGN KEY (Product_ID) REFERENCES Product(Product_ID),
     FOREIGN KEY (User_ID)    REFERENCES User(User_ID),
-    UNIQUE KEY uq_snapshot (Outlet_ID, Product_ID, Snapshot_date, Snapshot_type)
+    UNIQUE KEY uq_snapshot (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type)
 ) ENGINE=InnoDB;
 
 -- ==================
@@ -117,14 +117,14 @@ CREATE TABLE IF NOT EXISTS Inventory_Snapshot (
 -- ==================
 CREATE TABLE IF NOT EXISTS Delivery (
     Delivery_ID   INT AUTO_INCREMENT PRIMARY KEY,
-    Outlet_ID     INT NOT NULL,
+    Kiosk_ID     INT NOT NULL,
     User_ID       INT NOT NULL,
     Product_ID    INT NOT NULL,
     Delivery_Date DATE NOT NULL,
     Quantity      INT NOT NULL DEFAULT 0,
     Locked_status TINYINT(1) NOT NULL DEFAULT 0,
     Created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (Outlet_ID)  REFERENCES Kiosk(Kiosk_ID),
+    FOREIGN KEY (Kiosk_ID)  REFERENCES Kiosk(Kiosk_ID),
     FOREIGN KEY (User_ID)    REFERENCES User(User_ID),
     FOREIGN KEY (Product_ID) REFERENCES Product(Product_ID)
 ) ENGINE=InnoDB;
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS Delivery (
 -- ==================
 CREATE TABLE IF NOT EXISTS Sales (
     Sales_ID      INT AUTO_INCREMENT PRIMARY KEY,
-    Outlet_ID     INT NOT NULL,
+    Kiosk_ID     INT NOT NULL,
     User_ID       INT NOT NULL,
     Product_ID    INT NOT NULL,
     Sales_date    DATE NOT NULL,
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS Sales (
     Line_total    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     Locked_status TINYINT(1) NOT NULL DEFAULT 0,
     Created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (Outlet_ID)  REFERENCES Kiosk(Kiosk_ID),
+    FOREIGN KEY (Kiosk_ID)  REFERENCES Kiosk(Kiosk_ID),
     FOREIGN KEY (User_ID)    REFERENCES User(User_ID),
     FOREIGN KEY (Product_ID) REFERENCES Product(Product_ID)
 ) ENGINE=InnoDB;
@@ -153,14 +153,14 @@ CREATE TABLE IF NOT EXISTS Sales (
 -- ==================
 CREATE TABLE IF NOT EXISTS Expenses (
     Expense_ID   INT AUTO_INCREMENT PRIMARY KEY,
-    Outlet_ID    INT NOT NULL,
+    Kiosk_ID    INT NOT NULL,
     User_ID      INT NOT NULL,
     Expense_date DATE NOT NULL,
     Amount       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     Description  VARCHAR(255) NOT NULL,
     Locked_status TINYINT(1) NOT NULL DEFAULT 0,
     Created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (Outlet_ID) REFERENCES Kiosk(Kiosk_ID),
+    FOREIGN KEY (Kiosk_ID) REFERENCES Kiosk(Kiosk_ID),
     FOREIGN KEY (User_ID)   REFERENCES User(User_ID)
 ) ENGINE=InnoDB;
 
@@ -182,10 +182,10 @@ CREATE TABLE IF NOT EXISTS Audit_Log (
 CREATE TABLE IF NOT EXISTS Time_in (
     Timein_ID  INT AUTO_INCREMENT PRIMARY KEY,
     User_ID    INT NOT NULL,
-    Outlet_ID  INT NOT NULL,
+    Kiosk_ID  INT NOT NULL,
     Timestamp  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (User_ID)   REFERENCES User(User_ID),
-    FOREIGN KEY (Outlet_ID) REFERENCES Kiosk(Kiosk_ID)
+    FOREIGN KEY (Kiosk_ID) REFERENCES Kiosk(Kiosk_ID)
 ) ENGINE=InnoDB;
 
 -- ============================================

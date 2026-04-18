@@ -17,10 +17,10 @@
         <form method="GET" action="<?= BASE_URL ?>/inventory" class="form-inline-row">
             <?php if (Auth::isOwner() && !empty($kiosks)): ?>
                 <div class="form-group">
-                    <label for="outlet_id">Kiosk</label>
-                    <select id="outlet_id" name="outlet_id" class="form-select" onchange="this.form.submit()">
+                    <label for="kiosk_id">Kiosk</label>
+                    <select id="kiosk_id" name="kiosk_id" class="form-select" onchange="this.form.submit()">
                         <?php foreach ($kiosks as $k): ?>
-                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $outlet_id ? 'selected' : '' ?>>
+                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $kiosk_id ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($k['Name']) ?>
                             </option>
                         <?php endforeach; ?>
@@ -42,7 +42,7 @@
             <h3>Recent Records</h3>
             <div class="history-links">
                 <?php foreach (array_slice($history, 0, 7) as $record): ?>
-                    <a href="<?= BASE_URL ?>/inventory?outlet_id=<?= $outlet_id ?>&date=<?= $record['Snapshot_date'] ?>"
+                    <a href="<?= BASE_URL ?>/inventory?kiosk_id=<?= $kiosk_id ?>&date=<?= $record['Snapshot_date'] ?>"
                        class="btn btn-sm <?= $record['Snapshot_date'] === $date ? 'btn-primary' : 'btn-outline' ?>">
                         <?= date('M j', strtotime($record['Snapshot_date'])) ?>
                         <?= $record['is_locked'] ? '&#128274;' : '' ?>
@@ -106,7 +106,7 @@
             <form method="POST" action="<?= BASE_URL ?>/inventory/store">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                 <input type="hidden" name="snapshot_type" value="beginning">
-                <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                 <input type="hidden" name="date" value="<?= $date ?>">
 
                 <div class="table-container">
@@ -200,7 +200,7 @@
             <form method="POST" action="<?= BASE_URL ?>/inventory/store">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                 <input type="hidden" name="snapshot_type" value="ending">
-                <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                 <input type="hidden" name="date" value="<?= $date ?>">
 
                 <div class="table-container">

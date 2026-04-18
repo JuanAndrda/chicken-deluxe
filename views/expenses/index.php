@@ -17,10 +17,10 @@
         <form method="GET" action="<?= BASE_URL ?>/expenses" class="form-inline-row">
             <?php if (Auth::isOwner() && !empty($kiosks)): ?>
                 <div class="form-group">
-                    <label for="outlet_id">Kiosk</label>
-                    <select id="outlet_id" name="outlet_id" class="form-select" onchange="this.form.submit()">
+                    <label for="kiosk_id">Kiosk</label>
+                    <select id="kiosk_id" name="kiosk_id" class="form-select" onchange="this.form.submit()">
                         <?php foreach ($kiosks as $k): ?>
-                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $outlet_id ? 'selected' : '' ?>>
+                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $kiosk_id ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($k['Name']) ?>
                             </option>
                         <?php endforeach; ?>
@@ -41,7 +41,7 @@
             <h3>Recent Expenses</h3>
             <div class="history-links">
                 <?php foreach (array_slice($history, 0, 7) as $record): ?>
-                    <a href="<?= BASE_URL ?>/expenses?outlet_id=<?= $outlet_id ?>&date=<?= $record['Expense_date'] ?>"
+                    <a href="<?= BASE_URL ?>/expenses?kiosk_id=<?= $kiosk_id ?>&date=<?= $record['Expense_date'] ?>"
                        class="btn btn-sm <?= $record['Expense_date'] === $date ? 'btn-primary' : 'btn-outline' ?>">
                         <?= date('M j', strtotime($record['Expense_date'])) ?>
                         (P<?= number_format($record['day_total'], 2) ?>)
@@ -58,7 +58,7 @@
             <h3>Record Expense</h3>
             <form method="POST" action="<?= BASE_URL ?>/expenses/store" class="form-inline-row">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                 <input type="hidden" name="date" value="<?= $date ?>">
 
                 <div class="form-group">
@@ -89,7 +89,7 @@
                 <?php if (!empty($expenses) && !$any_locked && $is_today && Auth::isOwner()): ?>
                     <form method="POST" action="<?= BASE_URL ?>/expenses/lock" class="inline-form">
                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                        <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                        <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                         <input type="hidden" name="date" value="<?= $date ?>">
                         <button type="submit" class="btn btn-sm btn-secondary"
                                 onclick="return confirm('Lock all expense records for today?')">

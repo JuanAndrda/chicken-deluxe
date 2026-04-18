@@ -75,9 +75,9 @@ class AuthController extends Controller
         $this->auditLog->log($user['User_ID'], ACTION_LOGIN, 'User logged in');
 
         // Auto time-in for staff
-        if ((int) $user['Role_ID'] === ROLE_STAFF && $user['Outlet_ID']) {
+        if ((int) $user['Role_ID'] === ROLE_STAFF && $user['Kiosk_ID']) {
             if (!$this->timeInModel->hasTimedInToday($user['User_ID'])) {
-                $this->timeInModel->recordTimeIn($user['User_ID'], $user['Outlet_ID']);
+                $this->timeInModel->recordTimeIn($user['User_ID'], $user['Kiosk_ID']);
             }
         }
 

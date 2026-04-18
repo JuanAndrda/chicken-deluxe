@@ -28,7 +28,7 @@ class Auth
         $_SESSION['user_id']    = $user['User_ID'];
         $_SESSION['username']   = $user['Username'];
         $_SESSION['role_id']    = $user['Role_ID'];
-        $_SESSION['outlet_id']  = $user['Outlet_ID'];
+        $_SESSION['kiosk_id']  = $user['Kiosk_ID'];
         $_SESSION['full_name']  = $user['Full_name'];
         $_SESSION['logged_in']  = true;
         $_SESSION['last_activity'] = time();
@@ -66,10 +66,10 @@ class Auth
         return $_SESSION['role_id'] ?? null;
     }
 
-    /** Get the current user's assigned outlet ID */
-    public static function outletId(): ?int
+    /** Get the current user's assigned kiosk ID */
+    public static function kioskId(): ?int
     {
-        return $_SESSION['outlet_id'] ?? null;
+        return $_SESSION['kiosk_id'] ?? null;
     }
 
     /** Get the current user's full name */

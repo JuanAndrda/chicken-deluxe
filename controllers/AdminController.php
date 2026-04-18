@@ -69,10 +69,10 @@ class AdminController extends Controller
         $password  = $this->post('password');
         $full_name = trim($this->post('full_name'));
         $role_id   = (int) $this->post('role_id');
-        $outlet_id = $this->post('outlet_id') ? (int) $this->post('outlet_id') : null;
+        $kiosk_id = $this->post('kiosk_id') ? (int) $this->post('kiosk_id') : null;
 
         // Staff must have an assigned kiosk
-        if ($role_id === ROLE_STAFF && $outlet_id === null) {
+        if ($role_id === ROLE_STAFF && $kiosk_id === null) {
             $this->redirect('/admin/users?error=Staff+must+be+assigned+to+a+kiosk');
             return;
         }
@@ -84,7 +84,7 @@ class AdminController extends Controller
             return;
         }
 
-        $user_id = $this->userModel->create($role_id, $outlet_id, $username, $password, $full_name);
+        $user_id = $this->userModel->create($role_id, $kiosk_id, $username, $password, $full_name);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Created user: {$username} (ID:{$user_id})");
 
         $this->redirect('/admin/users?success=User+created+successfully');

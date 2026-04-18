@@ -2,7 +2,7 @@
     <h2>Deliveries</h2>
     <p>Manage and track all incoming deliveries.</p>
 
-    <?php if (Auth::isStaff() && Auth::outletId()): ?>
+    <?php if (Auth::isStaff() && Auth::kioskId()): ?>
         <p>Assigned kiosk: <strong><?= htmlspecialchars($kiosk_name ?? 'N/A') ?></strong></p>
     <?php endif; ?>
 

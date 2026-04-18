@@ -25,7 +25,7 @@ Replaces the current manual paper + Google Sheets process used across 5 food kio
 
 ## 2. KIOSK LOCATIONS
 
-The system covers 5 kiosk outlets:
+The system covers 5 kiosk kiosks:
 1. Tagbak, Jaro, Iloilo
 2. The Atrium Mall, Iloilo
 3. City Proper, Iloilo
@@ -63,7 +63,7 @@ The system covers 5 kiosk outlets:
 - Flag discrepancies between beginning stock, deliveries, sales, and ending stock
 
 ### C — Delivery Management
-- Staff encodes incoming deliveries (product, quantity, date, outlet)
+- Staff encodes incoming deliveries (product, quantity, date, kiosk)
 - Records linked to user and kiosk
 - Validate before saving
 - Past delivery records are locked after submission
@@ -78,7 +78,7 @@ The system covers 5 kiosk outlets:
 
 ### E — Reference Data Management
 - Manage product catalog (name, unit, active status)
-- Manage kiosk/outlet list
+- Manage kiosk/kiosk list
 - Manage user roles and permissions
 - Provides master reference data to all other processes
 - Only admin/owner can modify reference data
@@ -110,18 +110,18 @@ The system covers 5 kiosk outlets:
 |--------|------|-------|
 | User_ID | PK | |
 | Role_ID | FK → Role | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | Username | VARCHAR | |
 | Password | VARCHAR | Encrypted |
 | Active_status | BOOLEAN | |
 | Created_at | DATETIME | |
 
-#### `Kiosk` (Outlet)
+#### `Kiosk` (Kiosk)
 | Column | Type | Notes |
 |--------|------|-------|
 | Kiosk_ID | PK | |
 | Role_ID | FK → Role | |
-| Outlet_ID | FK | |
+| Kiosk_ID | FK | |
 | Password | VARCHAR | |
 | Created_at | DATETIME | |
 
@@ -138,7 +138,7 @@ The system covers 5 kiosk outlets:
 | Column | Type | Notes |
 |--------|------|-------|
 | Inventory_ID | PK | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | Product_ID | FK → Product | |
 | User_ID | FK → User | |
 | Locked_status | BOOLEAN | Auto-locked end of day |
@@ -151,7 +151,7 @@ The system covers 5 kiosk outlets:
 | Column | Type | Notes |
 |--------|------|-------|
 | Delivery_ID | PK | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | User_ID | FK → User | |
 | Product_ID | FK → Product | |
 | Delivery_Date | DATE | |
@@ -162,7 +162,7 @@ The system covers 5 kiosk outlets:
 | Column | Type | Notes |
 |--------|------|-------|
 | Sales_ID | PK | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | User_ID | FK → User | |
 | Product_ID | FK → Product | |
 | Sales_date | DATE | |
@@ -177,7 +177,7 @@ The system covers 5 kiosk outlets:
 | Column | Type | Notes |
 |--------|------|-------|
 | Expense_ID | PK | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | User_ID | FK → User | |
 | Expense_date | DATE | |
 | Amount | DECIMAL | |
@@ -197,7 +197,7 @@ The system covers 5 kiosk outlets:
 |--------|------|-------|
 | Timein_ID | PK | |
 | User_ID | FK → User | |
-| Outlet_ID | FK → Kiosk | |
+| Kiosk_ID | FK → Kiosk | |
 | Timestamp | DATETIME | |
 
 ---
@@ -361,7 +361,7 @@ Triggers automate backend logic that must happen every time a specific database 
 #### 1. Auto-lock records at end of day
 ```sql
 -- Example: After inventory snapshot is inserted for 'ending' type,
--- lock all records for that date and outlet
+-- lock all records for that date and kiosk
 DELIMITER $$
 CREATE TRIGGER trg_auto_lock_inventory
 AFTER INSERT ON Inventory_Snapshot
@@ -371,7 +371,7 @@ BEGIN
     UPDATE Inventory_Snapshot
     SET Locked_status = 1
     WHERE Snapshot_date = NEW.Snapshot_date
-      AND Outlet_ID = NEW.Outlet_ID;
+      AND Kiosk_ID = NEW.Kiosk_ID;
   END IF;
 END$$
 DELIMITER ;
@@ -444,7 +444,7 @@ WHERE TRIGGER_SCHEMA = 'chicken_deluxe';
 
 1. **Records auto-lock at end of each business day** — no staff edits after lock
 2. **Only Business Owner can unlock a locked record** — and this must be logged in Audit_Log
-3. **Staff can only see/enter data for their assigned Kiosk** — enforce via Outlet_ID on User
+3. **Staff can only see/enter data for their assigned Kiosk** — enforce via Kiosk_ID on User
 4. **Auditor is read-only** — no INSERT, UPDATE, or DELETE allowed
 5. **Every user action must create an Audit_Log entry** — especially login, logout, create, edit, delete, lock, unlock
 6. **Sales line totals = Quantity_sold × Unit_Price** — always auto-calculated, never manually entered

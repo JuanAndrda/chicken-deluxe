@@ -27,12 +27,12 @@ class InventoryController extends Controller
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
 
-        $outlet_id = $this->resolveOutlet();
-        $kiosk     = $this->kioskModel->findById($outlet_id);
+        $kiosk_id = $this->resolveKiosk();
+        $kiosk     = $this->kioskModel->findById($kiosk_id);
         $date      = $this->get('date', date('Y-m-d'));
 
-        $beginning = $this->inventoryModel->getByDateOutletType($date, $outlet_id, 'beginning');
-        $ending    = $this->inventoryModel->getByDateOutletType($date, $outlet_id, 'ending');
+        $beginning = $this->inventoryModel->getByDateKioskType($date, $kiosk_id, 'beginning');
+        $ending    = $this->inventoryModel->getByDateKioskType($date, $kiosk_id, 'ending');
 
         $has_beginning = !empty($beginning);
         $has_ending    = !empty($ending);
@@ -41,7 +41,7 @@ class InventoryController extends Controller
         $data = [
             'page_title'    => 'Inventory',
             'kiosk'         => $kiosk,
-            'outlet_id'     => $outlet_id,
+            'kiosk_id'     => $kiosk_id,
             'date'          => $date,
             'beginning'     => $beginning,
             'ending'        => $ending,
@@ -50,7 +50,7 @@ class InventoryController extends Controller
             'is_today'      => $is_today,
             'products'      => $this->productModel->getActiveGrouped(),
             'kiosks'        => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'       => $this->inventoryModel->getRecordedDates($outlet_id),
+            'history'       => $this->inventoryModel->getRecordedDates($kiosk_id),
             'success'       => $_GET['success'] ?? null,
             'error'         => $_GET['error'] ?? null,
         ];
@@ -68,7 +68,7 @@ class InventoryController extends Controller
             return;
         }
 
-        $outlet_id = $this->resolveOutlet();
+        $kiosk_id = $this->resolveKiosk();
         $type      = $this->post('snapshot_type');
         $date      = $this->post('date', date('Y-m-d'));
 
@@ -78,11 +78,11 @@ class InventoryController extends Controller
         }
 
         // Prevent duplicate submissions
-        if ($type === 'beginning' && $this->inventoryModel->hasBeginningToday($outlet_id) && $date === date('Y-m-d')) {
+        if ($type === 'beginning' && $this->inventoryModel->hasBeginningToday($kiosk_id) && $date === date('Y-m-d')) {
             $this->redirect('/inventory?error=Beginning+stock+already+recorded+today');
             return;
         }
-        if ($type === 'ending' && $this->inventoryModel->hasEndingToday($outlet_id) && $date === date('Y-m-d')) {
+        if ($type === 'ending' && $this->inventoryModel->hasEndingToday($kiosk_id) && $date === date('Y-m-d')) {
             $this->redirect('/inventory?error=Ending+stock+already+recorded+today');
             return;
         }
@@ -102,13 +102,13 @@ class InventoryController extends Controller
 
         try {
             $count = $this->inventoryModel->createBatchSnapshots(
-                $outlet_id, Auth::userId(), $type, $clean_quantities, $date
+                $kiosk_id, Auth::userId(), $type, $clean_quantities, $date
             );
 
             $label = ucfirst($type);
             $this->auditLog->log(
                 Auth::userId(), ACTION_CREATE,
-                "{$label} stock recorded: {$count} products for outlet {$outlet_id} on {$date}"
+                "{$label} stock recorded: {$count} products for kiosk {$kiosk_id} on {$date}"
             );
 
             $this->redirect("/inventory?date={$date}&success={$label}+stock+recorded+successfully+({$count}+products)");
@@ -136,15 +136,15 @@ class InventoryController extends Controller
         $this->redirect("/inventory?date={$date}&success=Record+unlocked");
     }
 
-    /** Determine which outlet to use (staff=assigned, owner=selected or first) */
-    private function resolveOutlet(): int
+    /** Determine which kiosk to use (staff=assigned, owner=selected or first) */
+    private function resolveKiosk(): int
     {
         if (Auth::isStaff()) {
-            return Auth::outletId();
+            return Auth::kioskId();
         }
 
         // Owner can select a kiosk
-        $selected = $this->get('outlet_id', $this->post('outlet_id'));
+        $selected = $this->get('kiosk_id', $this->post('kiosk_id'));
         if ($selected) {
             return (int) $selected;
         }

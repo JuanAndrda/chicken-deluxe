@@ -20,10 +20,10 @@
         <form method="GET" action="<?= BASE_URL ?>/sales" class="form-inline-row">
             <?php if (Auth::isOwner() && !empty($kiosks)): ?>
                 <div class="form-group">
-                    <label for="outlet_id">Kiosk</label>
-                    <select id="outlet_id" name="outlet_id" class="form-select" onchange="this.form.submit()">
+                    <label for="kiosk_id">Kiosk</label>
+                    <select id="kiosk_id" name="kiosk_id" class="form-select" onchange="this.form.submit()">
                         <?php foreach ($kiosks as $k): ?>
-                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $outlet_id ? 'selected' : '' ?>>
+                            <option value="<?= $k['Kiosk_ID'] ?>" <?= $k['Kiosk_ID'] == $kiosk_id ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($k['Name']) ?>
                             </option>
                         <?php endforeach; ?>
@@ -85,7 +85,7 @@
                     <h3>Record Sale</h3>
                     <form method="POST" action="<?= BASE_URL ?>/sales/store" id="posForm">
                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                        <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                        <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                         <input type="hidden" name="date" value="<?= $date ?>">
                         <input type="hidden" name="product_id" id="posProductId" value="">
 
@@ -131,7 +131,7 @@
                         <?php if (!empty($sales) && !$any_locked && $is_today && Auth::isOwner()): ?>
                             <form method="POST" action="<?= BASE_URL ?>/sales/lock" class="inline-form">
                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                                <input type="hidden" name="outlet_id" value="<?= $outlet_id ?>">
+                                <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                                 <input type="hidden" name="date" value="<?= $date ?>">
                                 <button type="submit" class="btn btn-sm btn-secondary"
                                         onclick="return confirm('Lock all sales records for today?')">

@@ -63,14 +63,14 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 ## TABLE 2 — `Kiosk`
 
 - **Purpose:** Stores the 5 physical kiosk locations where the business operates. Every sale, delivery, expense, and inventory record links back to a kiosk.
-- **Used By:** Process **E** (Reference Data) — and indirectly **every** other process via `Outlet_ID`.
-- **ERD Status:** ⚠️ **MODIFIED** — the ERD listed wrong columns (`Role_ID`, `Outlet_ID`, `Password` — a copy-paste error from the User table). Replaced with the correct kiosk columns.
+- **Used By:** Process **E** (Reference Data) — and indirectly **every** other process via `Kiosk_ID`.
+- **ERD Status:** ⚠️ **MODIFIED** — the ERD listed wrong columns (`Role_ID`, `Kiosk_ID`, `Password` — a copy-paste error from the User table). Replaced with the correct kiosk columns.
 - **Why it was changed:** A kiosk is a physical place. It needs a name and an address — not a role or a password. The Owner can also temporarily disable a kiosk (`Active = 0`) without deleting it.
 - **Seed data:** Tagbak, Atrium, City Proper, Supermart, Aldeguer.
 
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
-| `Kiosk_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each kiosk | Used as the foreign key (`Outlet_ID`) on every operational table |
+| `Kiosk_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each kiosk | Used as the foreign key (`Kiosk_ID`) on every operational table |
 | `Name` | VARCHAR(100) | NOT NULL | Short kiosk name shown in headers and dropdowns (e.g. "Tagbak Branch") | Lets the UI show a human-readable label instead of an ID number |
 | `Location` | VARCHAR(255) | NOT NULL | Full address of the kiosk | Used in reports and on the Manage Kiosks admin page |
 | `Active` | TINYINT(1) | NOT NULL, DEFAULT 1 | Tells the system whether this kiosk is currently operating. 1 = open, 0 = temporarily disabled | Lets the Owner pause a kiosk without deleting historical records (deleting would orphan past sales) |
@@ -82,14 +82,14 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 
 - **Purpose:** Stores all the people who can log in — the Owner, kiosk staff, and any auditors. Their assigned role and (for staff) their assigned kiosk live here.
 - **Used By:** Process **A** primarily; every other process needs `User_ID` for record-tracking and audit trails.
-- **ERD Status:** ⚠️ **MODIFIED** — added `Full_name` column for display purposes; clarified `Outlet_ID` as nullable.
-- **Why it was changed:** The ERD listed Password but not `Full_name`. We need a real name to show in headers ("Cherryll Laud") instead of a username ("owner1"), and to make audit log entries readable. `Outlet_ID` is nullable because Owner and Auditor are not tied to a single kiosk.
+- **ERD Status:** ⚠️ **MODIFIED** — added `Full_name` column for display purposes; clarified `Kiosk_ID` as nullable.
+- **Why it was changed:** The ERD listed Password but not `Full_name`. We need a real name to show in headers ("Cherryll Laud") instead of a username ("owner1"), and to make audit log entries readable. `Kiosk_ID` is nullable because Owner and Auditor are not tied to a single kiosk.
 
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `User_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each user | Foreign key on every operational table for record-tracking |
 | `Role_ID` | INT | NOT NULL, FK → `Role(Role_ID)` | Tells the system whether this user is Owner, Staff, or Auditor | Drives every role check — what menu appears, what they can edit, etc. |
-| `Outlet_ID` | INT | **NULL allowed**, FK → `Kiosk(Kiosk_ID)` | The kiosk this user belongs to | NULL for Owner/Auditor so they can see all kiosks. For Staff this enforces "you can only see your own kiosk" |
+| `Kiosk_ID` | INT | **NULL allowed**, FK → `Kiosk(Kiosk_ID)` | The kiosk this user belongs to | NULL for Owner/Auditor so they can see all kiosks. For Staff this enforces "you can only see your own kiosk" |
 | `Username` | VARCHAR(50) | NOT NULL, UNIQUE | The name typed at the login screen | UNIQUE prevents two users sharing a login — defense-in-depth at the DB level |
 | `Password` | VARCHAR(255) | NOT NULL | Encrypted password (bcrypt hash) | 255 characters because bcrypt produces 60-character hashes today, and the column is sized to allow stronger algorithms later |
 | `Full_name` | VARCHAR(100) | NOT NULL | Real name shown in the header bar and audit log entries | **NEW vs ERD.** Without it, audit logs and headers would only show usernames — Cherryll wanted to see real names |
@@ -146,7 +146,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `Inventory_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each snapshot row | — |
-| `Outlet_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk this stock count is for | Lets staff see only their kiosk; lets reports filter by kiosk |
+| `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk this stock count is for | Lets staff see only their kiosk; lets reports filter by kiosk |
 | `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` | The product being counted | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The user who recorded this count | Audit trail — we always know who entered the number |
 | `Locked_status` | TINYINT(1) | NOT NULL, DEFAULT 0 | Whether this snapshot is locked. 1 = locked, 0 = still editable | **Core lock-out mechanism.** Once 1, only the Owner can flip it back to 0, and the trigger logs that unlock to the audit log |
@@ -155,7 +155,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | `Quantity` | INT | NOT NULL, DEFAULT 0 | The actual quantity on hand | The reason the row exists |
 | `Recorded_at` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Exact timestamp when this row was saved | — |
 
-**Special key:** `UNIQUE KEY uq_snapshot (Outlet_ID, Product_ID, Snapshot_date, Snapshot_type)` — prevents duplicate snapshots.
+**Special key:** `UNIQUE KEY uq_snapshot (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type)` — prevents duplicate snapshots.
 
 ---
 
@@ -169,7 +169,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `Delivery_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each delivery row | — |
-| `Outlet_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk that received the delivery | — |
+| `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk that received the delivery | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The user who recorded the delivery | Audit trail |
 | `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` | Which product was delivered | — |
 | `Delivery_Date` | DATE | NOT NULL | The day the delivery arrived | Used by the daily report query |
@@ -189,7 +189,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `Sales_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each sale line | — |
-| `Outlet_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk where the sale happened | — |
+| `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk where the sale happened | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The staff member who recorded the sale | Audit trail |
 | `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` | Which product was sold | — |
 | `Sales_date` | DATE | NOT NULL | The day the sale was made | Used by the daily report query |
@@ -211,7 +211,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `Expense_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each expense row | — |
-| `Outlet_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk that incurred the expense | — |
+| `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk that incurred the expense | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The user who recorded the expense | Audit trail |
 | `Expense_date` | DATE | NOT NULL | The day the expense happened | Used by the daily report query |
 | `Amount` | DECIMAL(10,2) | NOT NULL, DEFAULT `0.00` | The peso amount of the expense | — |
@@ -249,7 +249,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 |-------------|-----------|-------------|-------------|----------------|
 | `Timein_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each time-in entry | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The staff member who clocked in | Lets the report show attendance by staff |
-| `Outlet_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk where they clocked in | Lets the Owner see which kiosk each staff member worked at |
+| `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk where they clocked in | Lets the Owner see which kiosk each staff member worked at |
 | `Timestamp` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Exact moment they clocked in | The reason the row exists |
 
 ---
@@ -464,8 +464,8 @@ This trigger was originally planned in `PROJECT_CONTEXT.md`. It was supposed to 
 if ($type === 'ending') {
     $this->db->write(
         "UPDATE Inventory_Snapshot SET Locked_status = 1
-         WHERE Outlet_ID = ? AND Snapshot_date = ? AND Locked_status = 0",
-        [$outlet_id, $snapshot_date]
+         WHERE Kiosk_ID = ? AND Snapshot_date = ? AND Locked_status = 0",
+        [$kiosk_id, $snapshot_date]
     );
 }
 ```
@@ -487,7 +487,7 @@ if ($type === 'ending') {
 
 | Table | Key Name | Columns | Purpose |
 |-------|----------|---------|---------|
-| `Inventory_Snapshot` | `uq_snapshot` (UNIQUE) | (Outlet_ID, Product_ID, Snapshot_date, Snapshot_type) | Prevents duplicate beginning/ending snapshots for the same kiosk + product + date |
+| `Inventory_Snapshot` | `uq_snapshot` (UNIQUE) | (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type) | Prevents duplicate beginning/ending snapshots for the same kiosk + product + date |
 | `User` | (UNIQUE on Username) | Username | Two users can't share a login name |
 | `Role` | (UNIQUE on Name) | Name | Two roles can't share a name |
 | `Category` | (UNIQUE on Name) | Name | Two categories can't share a name |
@@ -501,22 +501,22 @@ The ERD only showed relationships as lines. The actual database enforces them wi
 | Child Table | Foreign Key | References |
 |-------------|------------|------------|
 | `User` | `Role_ID` | `Role(Role_ID)` |
-| `User` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `User` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 | `Product` | `Category_ID` | `Category(Category_ID)` |
-| `Inventory_Snapshot` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `Inventory_Snapshot` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 | `Inventory_Snapshot` | `Product_ID` | `Product(Product_ID)` |
 | `Inventory_Snapshot` | `User_ID` | `User(User_ID)` |
-| `Delivery` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `Delivery` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 | `Delivery` | `Product_ID` | `Product(Product_ID)` |
 | `Delivery` | `User_ID` | `User(User_ID)` |
-| `Sales` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `Sales` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 | `Sales` | `Product_ID` | `Product(Product_ID)` |
 | `Sales` | `User_ID` | `User(User_ID)` |
-| `Expenses` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `Expenses` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 | `Expenses` | `User_ID` | `User(User_ID)` |
 | `Audit_Log` | `User_ID` | `User(User_ID)` |
 | `Time_in` | `User_ID` | `User(User_ID)` |
-| `Time_in` | `Outlet_ID` | `Kiosk(Kiosk_ID)` |
+| `Time_in` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
 
 ## 3.4 Stored Procedures and Views
 
@@ -598,7 +598,7 @@ Every new or different item from the original ERD, in one place:
 | `trg_audit_inventory_unlock` | Trigger | `Inventory_Snapshot` | Auto-log a `RECORD_UNLOCKED` entry on every unlock |
 | `trg_auto_lock_inventory` | Removed trigger | `Inventory_Snapshot` | Replaced by PHP logic (MySQL error 1442) |
 | Seed: 3 roles | Seed data | `Role` | Owner / Staff / Auditor |
-| Seed: 5 kiosks | Seed data | `Kiosk` | All 5 outlets pre-loaded |
+| Seed: 5 kiosks | Seed data | `Kiosk` | All 5 kiosks pre-loaded |
 | Seed: 5 categories | Seed data | `Category` | Burgers / Drinks / Hotdogs / Ricebowl / Snacks |
 
 ---

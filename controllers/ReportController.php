@@ -36,11 +36,11 @@ class ReportController extends Controller
         Auth::requireRole([ROLE_OWNER, ROLE_AUDITOR]);
 
         $kiosks    = $this->kioskModel->getActive();
-        $outlet_id = (int) ($this->get('outlet_id') ?? ($kiosks[0]['Kiosk_ID'] ?? 1));
+        $kiosk_id = (int) ($this->get('kiosk_id') ?? ($kiosks[0]['Kiosk_ID'] ?? 1));
         $date      = $this->get('date', date('Y-m-d'));
-        $kiosk     = $this->kioskModel->findById($outlet_id);
+        $kiosk     = $this->kioskModel->findById($kiosk_id);
 
-        $report = $this->reportModel->getDailySummary($date, $outlet_id);
+        $report = $this->reportModel->getDailySummary($date, $kiosk_id);
 
         // Calculate totals
         $total_sales = 0;
@@ -57,7 +57,7 @@ class ReportController extends Controller
             'active_tab'      => 'daily',
             'kiosks'          => $kiosks,
             'kiosk'           => $kiosk,
-            'outlet_id'       => $outlet_id,
+            'kiosk_id'       => $kiosk_id,
             'date'            => $date,
             'report'          => $report,
             'total_sales'     => $total_sales,
@@ -73,7 +73,7 @@ class ReportController extends Controller
         Auth::requireRole([ROLE_OWNER, ROLE_AUDITOR]);
 
         $kiosks    = $this->kioskModel->getActive();
-        $outlet_id = $this->get('outlet_id') ? (int) $this->get('outlet_id') : null;
+        $kiosk_id = $this->get('kiosk_id') ? (int) $this->get('kiosk_id') : null;
 
         // Default to current week
         $from_date = $this->get('from_date', date('Y-m-d', strtotime('monday this week')));
@@ -81,9 +81,9 @@ class ReportController extends Controller
 
         $sales_by_kiosk   = $this->reportModel->getSalesTotalsByKiosk($from_date, $to_date);
         $expense_by_kiosk = $this->reportModel->getExpenseTotalsByKiosk($from_date, $to_date);
-        $daily_sales      = $this->reportModel->getDailySalesBreakdown($from_date, $to_date, $outlet_id);
-        $daily_expenses   = $this->reportModel->getDailyExpenseBreakdown($from_date, $to_date, $outlet_id);
-        $deliveries       = $this->reportModel->getDeliverySummary($from_date, $to_date, $outlet_id);
+        $daily_sales      = $this->reportModel->getDailySalesBreakdown($from_date, $to_date, $kiosk_id);
+        $daily_expenses   = $this->reportModel->getDailyExpenseBreakdown($from_date, $to_date, $kiosk_id);
+        $deliveries       = $this->reportModel->getDeliverySummary($from_date, $to_date, $kiosk_id);
         $anomalies        = $this->reportModel->getMissingSnapshots($from_date, $to_date);
 
         // Grand totals
@@ -96,7 +96,7 @@ class ReportController extends Controller
             'page_title'      => 'Consolidated Report',
             'active_tab'      => 'consolidated',
             'kiosks'          => $kiosks,
-            'outlet_id'       => $outlet_id,
+            'kiosk_id'       => $kiosk_id,
             'from_date'       => $from_date,
             'to_date'         => $to_date,
             'sales_by_kiosk'  => $sales_by_kiosk,
@@ -119,17 +119,17 @@ class ReportController extends Controller
         Auth::requireRole([ROLE_OWNER, ROLE_AUDITOR]);
 
         $kiosks    = $this->kioskModel->getActive();
-        $outlet_id = $this->get('outlet_id') ? (int) $this->get('outlet_id') : null;
+        $kiosk_id = $this->get('kiosk_id') ? (int) $this->get('kiosk_id') : null;
         $from_date = $this->get('from_date', date('Y-m-d'));
         $to_date   = $this->get('to_date', date('Y-m-d'));
 
-        $records = $this->timeInModel->getByDateRange($from_date, $to_date, $outlet_id);
+        $records = $this->timeInModel->getByDateRange($from_date, $to_date, $kiosk_id);
 
         $data = [
             'page_title'  => 'Staff Time-In',
             'active_tab'  => 'timein',
             'kiosks'      => $kiosks,
-            'outlet_id'   => $outlet_id,
+            'kiosk_id'   => $kiosk_id,
             'from_date'   => $from_date,
             'to_date'     => $to_date,
             'records'     => $records,

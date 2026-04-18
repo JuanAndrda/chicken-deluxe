@@ -11,7 +11,7 @@ class UserModel extends Model
             "SELECT u.*, r.Name AS Role_Name, k.Name AS Kiosk_Name
              FROM User u
              JOIN Role r ON u.Role_ID = r.Role_ID
-             LEFT JOIN Kiosk k ON u.Outlet_ID = k.Kiosk_ID
+             LEFT JOIN Kiosk k ON u.Kiosk_ID = k.Kiosk_ID
              WHERE u.Username = ?",
             [$username]
         );
@@ -24,7 +24,7 @@ class UserModel extends Model
             "SELECT u.*, r.Name AS Role_Name, k.Name AS Kiosk_Name
              FROM User u
              JOIN Role r ON u.Role_ID = r.Role_ID
-             LEFT JOIN Kiosk k ON u.Outlet_ID = k.Kiosk_ID
+             LEFT JOIN Kiosk k ON u.Kiosk_ID = k.Kiosk_ID
              WHERE u.User_ID = ?",
             [$user_id]
         );
@@ -37,20 +37,20 @@ class UserModel extends Model
             "SELECT u.*, r.Name AS Role_Name, k.Name AS Kiosk_Name
              FROM User u
              JOIN Role r ON u.Role_ID = r.Role_ID
-             LEFT JOIN Kiosk k ON u.Outlet_ID = k.Kiosk_ID
+             LEFT JOIN Kiosk k ON u.Kiosk_ID = k.Kiosk_ID
              WHERE u.Active_status = 1
              ORDER BY u.User_ID"
         );
     }
 
     /** Create a new user */
-    public function create(int $role_id, ?int $outlet_id, string $username, string $password, string $full_name): int
+    public function create(int $role_id, ?int $kiosk_id, string $username, string $password, string $full_name): int
     {
         $hashed = password_hash($password, PASSWORD_BCRYPT);
         return $this->db->insert(
-            "INSERT INTO User (Role_ID, Outlet_ID, Username, Password, Full_name)
+            "INSERT INTO User (Role_ID, Kiosk_ID, Username, Password, Full_name)
              VALUES (?, ?, ?, ?, ?)",
-            [$role_id, $outlet_id, $username, $hashed, $full_name]
+            [$role_id, $kiosk_id, $username, $hashed, $full_name]
         );
     }
 

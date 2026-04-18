@@ -27,12 +27,12 @@ class SalesController extends Controller
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
 
-        $outlet_id = $this->resolveOutlet();
-        $kiosk     = $this->kioskModel->findById($outlet_id);
+        $kiosk_id = $this->resolveKiosk();
+        $kiosk     = $this->kioskModel->findById($kiosk_id);
         $date      = $this->get('date', date('Y-m-d'));
 
-        $sales     = $this->salesModel->getByDateAndOutlet($date, $outlet_id);
-        $day_total = $this->salesModel->getDailyTotal($date, $outlet_id);
+        $sales     = $this->salesModel->getByDateAndKiosk($date, $kiosk_id);
+        $day_total = $this->salesModel->getDailyTotal($date, $kiosk_id);
         $is_today  = ($date === date('Y-m-d'));
         $any_locked = false;
         foreach ($sales as $s) {
@@ -42,7 +42,7 @@ class SalesController extends Controller
         $data = [
             'page_title'   => 'Sales',
             'kiosk'        => $kiosk,
-            'outlet_id'    => $outlet_id,
+            'kiosk_id'    => $kiosk_id,
             'date'         => $date,
             'sales'        => $sales,
             'day_total'    => $day_total,
@@ -51,7 +51,7 @@ class SalesController extends Controller
             'products'     => $this->productModel->getActiveGrouped(),
             'product_map'  => $this->productModel->getActiveAsMap(),
             'kiosks'       => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'      => $this->salesModel->getRecordedDates($outlet_id),
+            'history'      => $this->salesModel->getRecordedDates($kiosk_id),
             'success'      => $_GET['success'] ?? null,
             'error'        => $_GET['error'] ?? null,
         ];
@@ -69,7 +69,7 @@ class SalesController extends Controller
             return;
         }
 
-        $outlet_id  = $this->resolveOutlet();
+        $kiosk_id  = $this->resolveKiosk();
         $product_id = (int) $this->post('product_id');
         $qty_sold   = (int) $this->post('quantity_sold');
         $date       = $this->post('date', date('Y-m-d'));
@@ -87,10 +87,10 @@ class SalesController extends Controller
         }
         $unit_price = (float) $product['Price'];
 
-        $sales_id = $this->salesModel->create($outlet_id, Auth::userId(), $product_id, $date, $qty_sold, $unit_price);
+        $sales_id = $this->salesModel->create($kiosk_id, Auth::userId(), $product_id, $date, $qty_sold, $unit_price);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Sales ID:{$sales_id} — product:{$product_id}, qty:{$qty_sold}, price:{$unit_price}");
 
-        $this->redirect("/sales?date={$date}&outlet_id={$outlet_id}&success=Sale+recorded");
+        $this->redirect("/sales?date={$date}&kiosk_id={$kiosk_id}&success=Sale+recorded");
     }
 
     /** Lock all sales for a date */
@@ -103,11 +103,11 @@ class SalesController extends Controller
             return;
         }
 
-        $outlet_id = $this->resolveOutlet();
+        $kiosk_id = $this->resolveKiosk();
         $date      = $this->post('date', date('Y-m-d'));
 
-        $count = $this->salesModel->lockByDate($outlet_id, $date);
-        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} sales for outlet:{$outlet_id} on {$date}");
+        $count = $this->salesModel->lockByDate($kiosk_id, $date);
+        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} sales for kiosk:{$kiosk_id} on {$date}");
 
         $this->redirect("/sales?date={$date}&success=Sales+locked+({$count}+records)");
     }
@@ -153,13 +153,13 @@ class SalesController extends Controller
         }
     }
 
-    /** Determine which outlet to use */
-    private function resolveOutlet(): int
+    /** Determine which kiosk to use */
+    private function resolveKiosk(): int
     {
         if (Auth::isStaff()) {
-            return Auth::outletId();
+            return Auth::kioskId();
         }
-        $selected = $this->get('outlet_id', $this->post('outlet_id'));
+        $selected = $this->get('kiosk_id', $this->post('kiosk_id'));
         if ($selected) {
             return (int) $selected;
         }

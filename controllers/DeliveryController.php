@@ -27,11 +27,11 @@ class DeliveryController extends Controller
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
 
-        $outlet_id = $this->resolveOutlet();
-        $kiosk     = $this->kioskModel->findById($outlet_id);
+        $kiosk_id = $this->resolveKiosk();
+        $kiosk     = $this->kioskModel->findById($kiosk_id);
         $date      = $this->get('date', date('Y-m-d'));
 
-        $deliveries = $this->deliveryModel->getByDateAndOutlet($date, $outlet_id);
+        $deliveries = $this->deliveryModel->getByDateAndKiosk($date, $kiosk_id);
         $is_today   = ($date === date('Y-m-d'));
         $any_locked = false;
         foreach ($deliveries as $d) {
@@ -41,7 +41,7 @@ class DeliveryController extends Controller
         $data = [
             'page_title'  => 'Deliveries',
             'kiosk'       => $kiosk,
-            'outlet_id'   => $outlet_id,
+            'kiosk_id'   => $kiosk_id,
             'date'        => $date,
             'deliveries'  => $deliveries,
             'is_today'    => $is_today,
@@ -49,7 +49,7 @@ class DeliveryController extends Controller
             'products'    => $this->productModel->getActiveGrouped(),
             'product_map' => $this->productModel->getActiveAsMap(),
             'kiosks'      => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'     => $this->deliveryModel->getRecordedDates($outlet_id),
+            'history'     => $this->deliveryModel->getRecordedDates($kiosk_id),
             'success'     => $_GET['success'] ?? null,
             'error'       => $_GET['error'] ?? null,
         ];
@@ -67,7 +67,7 @@ class DeliveryController extends Controller
             return;
         }
 
-        $outlet_id  = $this->resolveOutlet();
+        $kiosk_id  = $this->resolveKiosk();
         $product_id = (int) $this->post('product_id');
         $quantity   = (int) $this->post('quantity');
         $date       = $this->post('date', date('Y-m-d'));
@@ -77,7 +77,7 @@ class DeliveryController extends Controller
             return;
         }
 
-        $delivery_id = $this->deliveryModel->create($outlet_id, Auth::userId(), $product_id, $date, $quantity);
+        $delivery_id = $this->deliveryModel->create($kiosk_id, Auth::userId(), $product_id, $date, $quantity);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Delivery ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
 
         $this->redirect("/delivery?date={$date}&success=Delivery+recorded");
@@ -93,11 +93,11 @@ class DeliveryController extends Controller
             return;
         }
 
-        $outlet_id = $this->resolveOutlet();
+        $kiosk_id = $this->resolveKiosk();
         $date      = $this->post('date', date('Y-m-d'));
 
-        $count = $this->deliveryModel->lockByDate($outlet_id, $date);
-        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} deliveries for outlet:{$outlet_id} on {$date}");
+        $count = $this->deliveryModel->lockByDate($kiosk_id, $date);
+        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} deliveries for kiosk:{$kiosk_id} on {$date}");
 
         $this->redirect("/delivery?date={$date}&success=Deliveries+locked+({$count}+records)");
     }
@@ -143,13 +143,13 @@ class DeliveryController extends Controller
         }
     }
 
-    /** Determine which outlet to use */
-    private function resolveOutlet(): int
+    /** Determine which kiosk to use */
+    private function resolveKiosk(): int
     {
         if (Auth::isStaff()) {
-            return Auth::outletId();
+            return Auth::kioskId();
         }
-        $selected = $this->get('outlet_id', $this->post('outlet_id'));
+        $selected = $this->get('kiosk_id', $this->post('kiosk_id'));
         if ($selected) {
             return (int) $selected;
         }

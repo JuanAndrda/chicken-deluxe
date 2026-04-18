@@ -2,7 +2,7 @@
     <h2>Welcome, <?= htmlspecialchars(Auth::fullName() ?? '') ?>!</h2>
     <p>You are logged in as <strong><?= ROLE_NAMES[Auth::roleId()] ?? 'Unknown' ?></strong>.</p>
 
-    <?php if (Auth::isStaff() && Auth::outletId()): ?>
+    <?php if (Auth::isStaff() && Auth::kioskId()): ?>
         <p>Assigned kiosk: <strong><?= htmlspecialchars($kiosk_name ?? 'N/A') ?></strong></p>
     <?php endif; ?>
 

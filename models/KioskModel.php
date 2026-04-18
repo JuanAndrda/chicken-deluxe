@@ -1,6 +1,6 @@
 <?php
 /**
- * KioskModel — handles Kiosk/Outlet table operations
+ * KioskModel — handles Kiosk/Kiosk table operations
  */
 class KioskModel extends Model
 {
