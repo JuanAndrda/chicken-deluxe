@@ -188,8 +188,13 @@ The system covers 5 kiosk kiosks:
 | Column | Type | Notes |
 |--------|------|-------|
 | Log_ID | PK | |
-| User_ID | FK → User | |
-| Action | VARCHAR | e.g. LOGIN, LOCK, EDIT |
+| User_ID | FK → User | NULL allowed (failed logins, system-triggered changes) |
+| Action | VARCHAR(100) | e.g. LOGIN, LOCK, INSERT, UPDATE, DELETE |
+| Operation | VARCHAR(10) | INSERT / UPDATE / DELETE — set by change-logging triggers |
+| Table_name | VARCHAR(100) | Source table name — set by change-logging triggers |
+| Old_values | TEXT | JSON snapshot of OLD row (UPDATE / DELETE only) |
+| New_values | TEXT | JSON snapshot of NEW row (INSERT / UPDATE only) |
+| Details | VARCHAR(255) | Human-readable description |
 | Timestamp | DATETIME | |
 
 #### `Time_in` *(newly added)*
@@ -356,7 +361,23 @@ public Connection getConnection(String operationType) {
 ### What Triggers Are Used For
 Triggers automate backend logic that must happen every time a specific database event occurs — without relying on application code to remember to do it.
 
-### Planned / Implemented Triggers
+### Current Trigger Inventory (28 total, as of 2026-04-20)
+
+**Business-rule triggers (7)** — validation + calculation:
+- `trg_calc_line_total_insert` / `trg_calc_line_total_update` — auto-compute `Sales.Line_total`
+- `trg_prevent_locked_sales_edit` / `..._inventory_edit` / `..._delivery_edit` / `..._expense_edit` — block UPDATE on locked rows via `SIGNAL SQLSTATE '45000'`
+- `trg_audit_inventory_unlock` — writes a `RECORD_UNLOCKED` row to `Audit_Log` whenever `Inventory_Snapshot.Locked_status` flips 1 → 0
+
+**Change-logging triggers (21)** — rubric §1.3:
+- Naming: `trg_log_<table>_<event>`
+- Coverage: `AFTER INSERT / UPDATE / DELETE` on **Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk** (7 tables × 3 events = 21)
+- Payload: `Operation`, `Table_name`, `Old_values` (JSON_OBJECT of OLD row), `New_values` (JSON_OBJECT of NEW row), `Details`, `Timestamp`
+- `User.Password` is deliberately excluded from the User triggers
+- Source: [`sql/triggers.sql`](sql/triggers.sql) (full definitions), [`sql/migrations/2026_add_change_logging.sql`](sql/migrations/2026_add_change_logging.sql) (install script)
+
+### Historical / Example Trigger Drafts
+
+The examples below pre-date the current implementation and are kept for context. The **live** definitions are in `sql/triggers.sql` — always treat that file as the source of truth.
 
 #### 1. Auto-lock records at end of day
 ```sql

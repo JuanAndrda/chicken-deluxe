@@ -225,15 +225,19 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 
 - **Purpose:** Permanent record of every important action — logins, creates, edits, deletes, locks, unlocks. The Owner uses this to investigate suspicious activity or track changes over time.
 - **Used By:** **Every** process writes to it; Process **F** (Reports) reads from it for the audit trail report.
-- **ERD Status:** ⚠️ **MODIFIED** — added `Details` column.
-- **Why it was changed:** The ERD only had `Action` (a code like `UPDATE`). Without context, an audit log of "UPDATE", "UPDATE", "UPDATE" is useless — you can't tell what was updated. The `Details` column adds a human-readable description of each action.
+- **ERD Status:** ⚠️ **MODIFIED** — added `Details` column plus four change-logging columns (`Operation`, `Table_name`, `Old_values`, `New_values`) in the 2026-04-20 migration.
+- **Why it was changed:** The ERD only had `Action` (a code like `UPDATE`). Without context, an audit log of "UPDATE", "UPDATE", "UPDATE" is useless — you can't tell what was updated or what the old vs new data looked like. The extra columns let the SQL triggers in §Part 2 record the affected table, the operation type, and a full JSON snapshot of OLD and NEW row values for every INSERT / UPDATE / DELETE.
 
 | Column Name | Data Type | Constraints | Description | Why It Matters |
 |-------------|-----------|-------------|-------------|----------------|
 | `Log_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each log entry | — |
-| `User_ID` | INT | **NULL allowed**, FK → `User(User_ID)` | The user who performed the action | NULL is allowed for failed logins where the user is unknown |
-| `Action` | VARCHAR(100) | NOT NULL | Short code for the action (`LOGIN`, `CREATE`, `UPDATE`, `RECORD_UNLOCKED`, etc.) | Lets reports filter by action type quickly |
-| `Details` | VARCHAR(255) | NULL allowed | Human-readable description (e.g. "Updated product ID:14") | **NEW vs ERD.** Turns the audit log from a list of codes into a readable history |
+| `User_ID` | INT | **NULL allowed**, FK → `User(User_ID)` | The user who performed the action | NULL for failed logins, and for changes to tables that have no `User_ID` column (Product / User / Kiosk) |
+| `Action` | VARCHAR(100) | NOT NULL | Short code for the action (`LOGIN`, `INSERT`, `UPDATE`, `DELETE`, `RECORD_UNLOCKED`, etc.) | Lets reports filter by action type quickly |
+| `Operation` | VARCHAR(10) | NULL allowed | `INSERT` / `UPDATE` / `DELETE` — populated by change-logging triggers only | **NEW.** Rubric §1.3 requires operation-type logging |
+| `Table_name` | VARCHAR(100) | NULL allowed | Name of the table the change hit (e.g. `Sales`, `Product`) | **NEW.** Lets the audit trail be filtered by table without parsing `Details` |
+| `Old_values` | TEXT | NULL allowed | JSON snapshot of the OLD row (UPDATE / DELETE only) | **NEW.** Satisfies the "record data changes" rubric item — full before-state |
+| `New_values` | TEXT | NULL allowed | JSON snapshot of the NEW row (INSERT / UPDATE only) | **NEW.** Full after-state; `User.Password` is deliberately omitted |
+| `Details` | VARCHAR(255) | NULL allowed | Human-readable description (e.g. "Updated product ID:14") | Turns the audit log from a list of codes into a readable history |
 | `Timestamp` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Exact date and time the action occurred | — |
 
 ---
@@ -259,7 +263,7 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 
 > All triggers live in [`sql/triggers.sql`](sql/triggers.sql). They are created on the **Master** node only and replicate to the **Slave** automatically. Triggers were a coursework requirement and are used here for things that **must** always happen, no matter which page or developer wrote the surrounding code.
 
-We have **7 active triggers** and **1 trigger that was removed** (because of a MySQL limitation, see Trigger 8).
+We have **28 active triggers** (7 business-rule triggers documented below as Triggers 1–7, plus 21 change-logging triggers documented as Trigger Group 9) and **1 trigger that was removed** (because of a MySQL limitation, see Trigger 8).
 
 ---
 
@@ -473,6 +477,59 @@ if ($type === 'ending') {
 `triggers.sql` keeps a `DROP TRIGGER IF EXISTS trg_auto_lock_inventory;` line so a stale trigger on an old database is safely cleaned up.
 
 ---
+
+### Trigger Group 9 — Change-Logging Triggers (`trg_log_<table>_<event>`)
+
+These 21 triggers were added on 2026-04-20 to satisfy rubric §1.3 ("record change logging with old/new values"). They are mechanical — same shape for every table — so they are documented once as a group instead of repeating 21 near-identical listings. The full source is in [`sql/triggers.sql`](sql/triggers.sql).
+
+**Coverage matrix — 7 tables × 3 events = 21 triggers:**
+
+| Table | INSERT | UPDATE | DELETE |
+|---|---|---|---|
+| `Sales` | `trg_log_sales_insert` | `trg_log_sales_update` | `trg_log_sales_delete` |
+| `Inventory_Snapshot` | `trg_log_inventory_snapshot_insert` | `trg_log_inventory_snapshot_update` | `trg_log_inventory_snapshot_delete` |
+| `Delivery` | `trg_log_delivery_insert` | `trg_log_delivery_update` | `trg_log_delivery_delete` |
+| `Expenses` | `trg_log_expenses_insert` | `trg_log_expenses_update` | `trg_log_expenses_delete` |
+| `Product` | `trg_log_product_insert` | `trg_log_product_update` | `trg_log_product_delete` |
+| `User` | `trg_log_user_insert` | `trg_log_user_update` | `trg_log_user_delete` |
+| `Kiosk` | `trg_log_kiosk_insert` | `trg_log_kiosk_update` | `trg_log_kiosk_delete` |
+
+**What every trigger does (uniform pattern):**
+
+1. Fires `AFTER` the DML event — so the row has its auto-increment PK and any default-valued columns already filled in.
+2. Builds `Old_values` (for UPDATE / DELETE) and `New_values` (for INSERT / UPDATE) as `JSON_OBJECT(...)` snapshots of every non-sensitive column.
+3. Inserts one row into `Audit_Log` populating `User_ID`, `Action`, `Operation`, `Table_name`, `Old_values`, `New_values`, `Details`, `Timestamp`.
+4. For tables that carry a `User_ID` column (Sales, Inventory_Snapshot, Delivery, Expenses), the trigger uses `NEW.User_ID` (INSERT/UPDATE) or `OLD.User_ID` (DELETE). For Product / User / Kiosk the row has no `User_ID` column, so the audit `User_ID` is stored as `NULL` and the identity is captured in `Details` + `New_values`/`Old_values` instead.
+
+**Security exclusion:** `User.Password` is deliberately **not** included in the `JSON_OBJECT` snapshots for the User triggers. Hashes should never end up in the audit trail.
+
+**Canonical example — `trg_log_product_update`:**
+
+```sql
+CREATE TRIGGER trg_log_product_update
+AFTER UPDATE ON Product
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log
+        (User_ID, Action, Operation, Table_name,
+         Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'UPDATE', 'UPDATE', 'Product',
+        JSON_OBJECT('Product_ID', OLD.Product_ID, 'Category_ID', OLD.Category_ID,
+                    'Name', OLD.Name, 'Unit', OLD.Unit,
+                    'Price', OLD.Price, 'Active', OLD.Active),
+        JSON_OBJECT('Product_ID', NEW.Product_ID, 'Category_ID', NEW.Category_ID,
+                    'Name', NEW.Name, 'Unit', NEW.Unit,
+                    'Price', NEW.Price, 'Active', NEW.Active),
+        CONCAT('Record updated in Product ID:', NEW.Product_ID),
+        NOW());
+END$$
+```
+
+**Live verification (2026-04-20):** inserting a test Product, updating its price, then deleting it produced `Audit_Log` rows 99, 100, 101 with the expected `Operation='INSERT'/'UPDATE'/'DELETE'`, `Table_name='Product'`, and fully populated JSON snapshots.
+
+**Note on `Audit_Log` duplication with `trg_audit_inventory_unlock`:** an Inventory_Snapshot unlock now produces **two** rows — one from the existing `trg_audit_inventory_unlock` (`Action='RECORD_UNLOCKED'`) and one from the new `trg_log_inventory_snapshot_update` (`Action='UPDATE'`). This is intentional — the two rows carry different semantic meaning (unlock event vs generic change) and the Reports module can filter either independently.
+
+---
 ---
 
 # PART 3 — OTHER SQL ADDITIONS
@@ -559,6 +616,9 @@ All `SELECT` queries go through `Database::read()` to the Slave node (port 3307)
 - The reporting page (joins Sales × Product × Category × Kiosk over a date range — the heaviest read consumer)
 - Listing past deliveries, sales, expenses for the records table
 - Auth lookups (find user by username on login)
+- **Two subquery-based reports** in `ReportModel.php`:
+  - `getProductsAboveAverageSales($from, $to)` — products whose total quantity sold in the range exceeds the average per-product total (uses nested derived tables in a `HAVING` clause)
+  - `getKiosksWithoutEndingSnapshot($date)` — active kiosks that haven't yet recorded an ending snapshot on the given date (uses a `NOT IN` subquery)
 
 ## 4.3 Schema Decisions Driven by Replication
 
@@ -586,6 +646,10 @@ Every new or different item from the original ERD, in one place:
 | `Locked_status` | New column | `Delivery` | Allow Owner to lock past delivery rows |
 | `Locked_status` | New column | `Expenses` | Allow Owner to lock past expense rows |
 | `Details` | New column | `Audit_Log` | Human-readable description of audited action |
+| `Operation` | New column | `Audit_Log` | INSERT / UPDATE / DELETE — populated by change-logging triggers |
+| `Table_name` | New column | `Audit_Log` | Source table name — populated by change-logging triggers |
+| `Old_values` | New column | `Audit_Log` | JSON snapshot of OLD row (UPDATE/DELETE) |
+| `New_values` | New column | `Audit_Log` | JSON snapshot of NEW row (INSERT/UPDATE) |
 | `Total_Amount` | Removed column | `Sales` | Daily totals computed at runtime — no duplicate storage |
 | `uq_snapshot` | Unique key | `Inventory_Snapshot` | Prevent duplicate beginning/ending snapshots |
 | `Snapshot_type` | ENUM | `Inventory_Snapshot` | Restrict value to `'beginning'` or `'ending'` |
@@ -597,6 +661,9 @@ Every new or different item from the original ERD, in one place:
 | `trg_prevent_locked_expense_edit` | Trigger | `Expenses` | Block edits on locked Expenses rows |
 | `trg_audit_inventory_unlock` | Trigger | `Inventory_Snapshot` | Auto-log a `RECORD_UNLOCKED` entry on every unlock |
 | `trg_auto_lock_inventory` | Removed trigger | `Inventory_Snapshot` | Replaced by PHP logic (MySQL error 1442) |
+| `trg_log_*_insert` (×7) | Trigger group | Sales/Inventory_Snapshot/Delivery/Expenses/Product/User/Kiosk | Change-logging: capture NEW row as JSON in Audit_Log |
+| `trg_log_*_update` (×7) | Trigger group | same 7 tables | Change-logging: capture OLD and NEW rows as JSON in Audit_Log |
+| `trg_log_*_delete` (×7) | Trigger group | same 7 tables | Change-logging: capture OLD row as JSON in Audit_Log |
 | Seed: 3 roles | Seed data | `Role` | Owner / Staff / Auditor |
 | Seed: 5 kiosks | Seed data | `Kiosk` | All 5 kiosks pre-loaded |
 | Seed: 5 categories | Seed data | `Category` | Burgers / Drinks / Hotdogs / Ricebowl / Snacks |
