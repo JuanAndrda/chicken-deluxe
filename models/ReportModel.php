@@ -208,4 +208,73 @@ class ReportModel extends Model
             [$from_date, $to_date]
         );
     }
+
+    /**
+     * SUBQUERY EXAMPLE #1
+     * Return products whose total quantity sold in the given date range
+     * is strictly above the system-wide average of per-product totals
+     * within that same range. Uses a correlated-free scalar subquery in
+     * the HAVING clause against a derived table of per-product sums.
+     *
+     * Output columns: Product_ID, Name, Category_Name, Total_Sold, Avg_Sold
+     */
+    public function getProductsAboveAverageSales(string $from_date, string $to_date): array
+    {
+        $sql = "SELECT p.Product_ID,
+                       p.Name,
+                       c.Name AS Category_Name,
+                       SUM(s.Quantity_sold) AS Total_Sold,
+                       (
+                           SELECT AVG(per_product_total)
+                           FROM (
+                               SELECT SUM(s2.Quantity_sold) AS per_product_total
+                               FROM Sales s2
+                               WHERE s2.Sales_date BETWEEN ? AND ?
+                               GROUP BY s2.Product_ID
+                           ) avg_src
+                       ) AS Avg_Sold
+                FROM Sales s
+                JOIN Product  p ON s.Product_ID = p.Product_ID
+                JOIN Category c ON p.Category_ID = c.Category_ID
+                WHERE s.Sales_date BETWEEN ? AND ?
+                GROUP BY p.Product_ID, p.Name, c.Name
+                HAVING Total_Sold > (
+                    SELECT AVG(per_product_total)
+                    FROM (
+                        SELECT SUM(s3.Quantity_sold) AS per_product_total
+                        FROM Sales s3
+                        WHERE s3.Sales_date BETWEEN ? AND ?
+                        GROUP BY s3.Product_ID
+                    ) avg_src2
+                )
+                ORDER BY Total_Sold DESC";
+
+        return $this->db->read($sql, [
+            $from_date, $to_date,
+            $from_date, $to_date,
+            $from_date, $to_date,
+        ]);
+    }
+
+    /**
+     * SUBQUERY EXAMPLE #2
+     * Return active kiosks that have NO ending snapshot recorded for the
+     * given date. Uses a NOT IN subquery to exclude kiosks that already
+     * closed the day's inventory.
+     */
+    public function getKiosksWithoutEndingSnapshot(string $date): array
+    {
+        $sql = "SELECT k.Kiosk_ID, k.Name, k.Location
+                FROM Kiosk k
+                WHERE k.Active = 1
+                  AND k.Kiosk_ID NOT IN (
+                      SELECT i.Kiosk_ID
+                      FROM Inventory_Snapshot i
+                      WHERE i.Snapshot_date = ?
+                        AND i.Snapshot_type = 'ending'
+                  )
+                ORDER BY k.Name";
+
+        return $this->db->read($sql, [$date]);
+    }
 }

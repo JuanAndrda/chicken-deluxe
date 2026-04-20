@@ -168,11 +168,15 @@ CREATE TABLE IF NOT EXISTS Expenses (
 -- 10. Audit_Log
 -- ==================
 CREATE TABLE IF NOT EXISTS Audit_Log (
-    Log_ID    INT AUTO_INCREMENT PRIMARY KEY,
-    User_ID   INT NULL,
-    Action    VARCHAR(100) NOT NULL,
-    Details   VARCHAR(255) NULL,
-    Timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Log_ID      INT AUTO_INCREMENT PRIMARY KEY,
+    User_ID     INT NULL,
+    Action      VARCHAR(100) NOT NULL,
+    Operation   VARCHAR(10) NULL,          -- INSERT / UPDATE / DELETE (for change-logging triggers)
+    Table_name  VARCHAR(100) NULL,         -- source table name (for change-logging triggers)
+    Old_values  TEXT NULL,                 -- JSON snapshot of OLD row (UPDATE/DELETE only)
+    New_values  TEXT NULL,                 -- JSON snapshot of NEW row (INSERT/UPDATE only)
+    Details     VARCHAR(255) NULL,
+    Timestamp   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (User_ID) REFERENCES User(User_ID)
 ) ENGINE=InnoDB;
 

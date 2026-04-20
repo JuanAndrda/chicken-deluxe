@@ -42,7 +42,7 @@
         </div>
 
         <div class="login-footer">
-            <p>&copy; <?= date('Y') ?> <?= APP_NAME ?> — Group 7, BSIT 2-B</p>
+            <p>&copy; <?= date('Y') ?> <?= APP_NAME ?> — Group 2, BSIT 2-B</p>
         </div>
     </div>
 </body>
