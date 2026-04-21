@@ -19,6 +19,8 @@
         </div>
     </div>
 
+    <?php require __DIR__ . '/modal.php'; ?>
+
     <script src="<?= BASE_URL ?>/assets/js/app.js"></script>
 </body>
 </html>

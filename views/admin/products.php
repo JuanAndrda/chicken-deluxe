@@ -149,10 +149,25 @@
                                 </span>
                             </td>
                             <td>
-                                <button type="submit" form="<?= $fid ?>" class="btn btn-sm btn-primary">Save</button>
-                                <button type="submit" form="toggle-<?= $product['Product_ID'] ?>"
+                                <button type="button" class="btn btn-sm btn-primary"
+                                        onclick="showConfirmModal({
+                                            title: 'Save Product Changes',
+                                            message: 'You\'re about to update this product. Price changes will apply to all new sales going forward — historical sales are not affected. Continue?',
+                                            confirmText: 'Yes, Save',
+                                            type: 'submit',
+                                            onConfirm: () => document.getElementById('<?= $fid ?>').submit()
+                                        })">Save</button>
+                                <button type="button"
                                         class="btn btn-sm <?= $product['Active'] ? 'btn-danger' : 'btn-success' ?>"
-                                        onclick="return confirm('Are you sure?')">
+                                        onclick="showConfirmModal({
+                                            title: <?= $product['Active'] ? "'Deactivate Product'" : "'Activate Product'" ?>,
+                                            message: <?= $product['Active']
+                                                ? "'Are you sure you want to deactivate this product? It will be hidden from the POS and sales screens.'"
+                                                : "'Are you sure you want to reactivate this product?'" ?>,
+                                            confirmText: <?= $product['Active'] ? "'Yes, Deactivate'" : "'Yes, Activate'" ?>,
+                                            type: <?= $product['Active'] ? "'delete'" : "'submit'" ?>,
+                                            onConfirm: () => document.getElementById('toggle-<?= $product['Product_ID'] ?>').submit()
+                                        })">
                                     <?= $product['Active'] ? 'Deactivate' : 'Activate' ?>
                                 </button>
                             </td>

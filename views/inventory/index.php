@@ -88,8 +88,14 @@
                                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                                 <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
                                                 <input type="hidden" name="date" value="<?= $date ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline"
-                                                        onclick="return confirm('Unlock this record?')">Unlock</button>
+                                                <button type="button" class="btn btn-sm btn-outline"
+                                                        onclick="showConfirmModal({
+                                                            title: 'Unlock Record',
+                                                            message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
+                                                            confirmText: 'Yes, Unlock',
+                                                            type: 'unlock',
+                                                            onConfirm: () => this.closest('form').submit()
+                                                        })">Unlock</button>
                                             </form>
                                         <?php else: ?>
                                             <span class="text-light">—</span>
@@ -137,8 +143,14 @@
                     </table>
                 </div>
                 <div class="form-actions" style="margin-top:16px">
-                    <button type="submit" class="btn btn-primary"
-                            onclick="return confirm('Submit beginning stock?')">Save Beginning Stock</button>
+                    <button type="button" class="btn btn-primary"
+                            onclick="showConfirmModal({
+                                title: 'Submit Beginning Stock',
+                                message: 'Are you sure you want to submit the beginning stock for today? Please double-check all quantities before confirming.',
+                                confirmText: 'Yes, Submit',
+                                type: 'submit',
+                                onConfirm: () => this.closest('form').submit()
+                            })">Save Beginning Stock</button>
                 </div>
             </form>
         <?php else: ?>
@@ -182,8 +194,14 @@
                                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                                 <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
                                                 <input type="hidden" name="date" value="<?= $date ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline"
-                                                        onclick="return confirm('Unlock this record?')">Unlock</button>
+                                                <button type="button" class="btn btn-sm btn-outline"
+                                                        onclick="showConfirmModal({
+                                                            title: 'Unlock Record',
+                                                            message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
+                                                            confirmText: 'Yes, Unlock',
+                                                            type: 'unlock',
+                                                            onConfirm: () => this.closest('form').submit()
+                                                        })">Unlock</button>
                                             </form>
                                         <?php else: ?>
                                             <span class="text-light">—</span>
@@ -231,8 +249,14 @@
                     </table>
                 </div>
                 <div class="form-actions" style="margin-top:16px">
-                    <button type="submit" class="btn btn-primary"
-                            onclick="return confirm('Submit ending stock?')">Save Ending Stock</button>
+                    <button type="button" class="btn btn-primary"
+                            onclick="showConfirmModal({
+                                title: 'Submit Ending Stock',
+                                message: 'Are you sure you want to submit the ending stock for today? This will lock all inventory records for this date.',
+                                confirmText: 'Yes, Submit',
+                                type: 'submit',
+                                onConfirm: () => this.closest('form').submit()
+                            })">Save Ending Stock</button>
                 </div>
             </form>
         <?php elseif ($is_today && !$has_beginning): ?>

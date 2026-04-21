@@ -94,8 +94,16 @@
                                     <form method="POST" action="<?= BASE_URL ?>/admin/users/<?= $user['Active_status'] ? 'deactivate' : 'activate' ?>" class="inline-form">
                                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                         <input type="hidden" name="user_id" value="<?= $user['User_ID'] ?>">
-                                        <button type="submit" class="btn btn-sm <?= $user['Active_status'] ? 'btn-danger' : 'btn-success' ?>"
-                                                onclick="return confirm('Are you sure?')">
+                                        <button type="button" class="btn btn-sm <?= $user['Active_status'] ? 'btn-danger' : 'btn-success' ?>"
+                                                onclick="showConfirmModal({
+                                                    title: <?= $user['Active_status'] ? "'Deactivate User'" : "'Activate User'" ?>,
+                                                    message: <?= $user['Active_status']
+                                                        ? "'Are you sure you want to deactivate this account? The user will no longer be able to log in.'"
+                                                        : "'Are you sure you want to reactivate this account?'" ?>,
+                                                    confirmText: <?= $user['Active_status'] ? "'Yes, Deactivate'" : "'Yes, Activate'" ?>,
+                                                    type: <?= $user['Active_status'] ? "'delete'" : "'submit'" ?>,
+                                                    onConfirm: () => this.closest('form').submit()
+                                                })">
                                             <?= $user['Active_status'] ? 'Deactivate' : 'Activate' ?>
                                         </button>
                                     </form>

@@ -67,8 +67,16 @@
                                     <input type="hidden" name="name" value="<?= htmlspecialchars($kiosk['Name']) ?>">
                                     <input type="hidden" name="location" value="<?= htmlspecialchars($kiosk['Location']) ?>">
                                     <input type="hidden" name="active" value="<?= $kiosk['Active'] ? '0' : '1' ?>">
-                                    <button type="submit" class="btn btn-sm <?= $kiosk['Active'] ? 'btn-danger' : 'btn-success' ?>"
-                                            onclick="return confirm('Are you sure?')">
+                                    <button type="button" class="btn btn-sm <?= $kiosk['Active'] ? 'btn-danger' : 'btn-success' ?>"
+                                            onclick="showConfirmModal({
+                                                title: <?= $kiosk['Active'] ? "'Deactivate Kiosk'" : "'Activate Kiosk'" ?>,
+                                                message: <?= $kiosk['Active']
+                                                    ? "'Are you sure you want to deactivate this kiosk? Staff assigned to it will not be able to record data while it is inactive.'"
+                                                    : "'Are you sure you want to reactivate this kiosk?'" ?>,
+                                                confirmText: <?= $kiosk['Active'] ? "'Yes, Deactivate'" : "'Yes, Activate'" ?>,
+                                                type: <?= $kiosk['Active'] ? "'delete'" : "'submit'" ?>,
+                                                onConfirm: () => this.closest('form').submit()
+                                            })">
                                         <?= $kiosk['Active'] ? 'Deactivate' : 'Activate' ?>
                                     </button>
                                 </form>

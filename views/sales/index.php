@@ -133,8 +133,14 @@
                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                 <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                                 <input type="hidden" name="date" value="<?= $date ?>">
-                                <button type="submit" class="btn btn-sm btn-secondary"
-                                        onclick="return confirm('Lock all sales records for today?')">
+                                <button type="button" class="btn btn-sm btn-secondary"
+                                        onclick="showConfirmModal({
+                                            title: 'Lock All Sales',
+                                            message: 'Are you sure you want to lock all sales records for today? Locked records cannot be edited by staff.',
+                                            confirmText: 'Lock All',
+                                            type: 'lock',
+                                            onConfirm: () => this.closest('form').submit()
+                                        })">
                                     Lock All
                                 </button>
                             </form>
@@ -182,16 +188,28 @@
                                                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                                         <input type="hidden" name="sales_id" value="<?= $s['Sales_ID'] ?>">
                                                         <input type="hidden" name="date" value="<?= $date ?>">
-                                                        <button type="submit" class="btn btn-sm btn-danger"
-                                                                onclick="return confirm('Delete this sale?')">Delete</button>
+                                                        <button type="button" class="btn btn-sm btn-danger"
+                                                                onclick="showConfirmModal({
+                                                                    title: 'Delete Sale',
+                                                                    message: 'Are you sure you want to delete this sale record? This action cannot be undone.',
+                                                                    confirmText: 'Yes, Delete',
+                                                                    type: 'delete',
+                                                                    onConfirm: () => this.closest('form').submit()
+                                                                })">Delete</button>
                                                     </form>
                                                 <?php elseif ($s['Locked_status']): ?>
                                                     <form method="POST" action="<?= BASE_URL ?>/sales/unlock" class="inline-form">
                                                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                                         <input type="hidden" name="sales_id" value="<?= $s['Sales_ID'] ?>">
                                                         <input type="hidden" name="date" value="<?= $date ?>">
-                                                        <button type="submit" class="btn btn-sm btn-outline"
-                                                                onclick="return confirm('Unlock this record?')">Unlock</button>
+                                                        <button type="button" class="btn btn-sm btn-outline"
+                                                                onclick="showConfirmModal({
+                                                                    title: 'Unlock Record',
+                                                                    message: 'Are you sure you want to unlock this sales record? This will allow editing of past data.',
+                                                                    confirmText: 'Yes, Unlock',
+                                                                    type: 'unlock',
+                                                                    onConfirm: () => this.closest('form').submit()
+                                                                })">Unlock</button>
                                                     </form>
                                                 <?php endif; ?>
                                             </td>
