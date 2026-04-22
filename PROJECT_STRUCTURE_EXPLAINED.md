@@ -172,8 +172,7 @@ A **controller** is the middleman between what the user wants and what the syste
   - **`index.php`** — Welcomes the user and shows quick summary tiles.
 
 - **`inventory/`** — Inventory module screens.
-  - **`index.php`** — Lists past inventory days (for browsing/auditing).
-  - **`inventory.php`** — The main daily entry form — beginning stock at the start of day, ending stock at the end.
+  - **`index.php`** — Tablet-friendly daily entry screen. Products are split into **category sub-tabs** (Burgers, Drinks, Hotdogs, Ricebowl, Snacks) so staff don't scroll a flat list of 33 items. Each row has finger-sized **+/− buttons**, a live **progress bar** ("X of 33 filled"), and a **sticky Save bar** anchored to the bottom of the screen so the submit button is always visible. The same tab layout is reused (read-only) for the saved/locked view of the day.
 
 - **`delivery/`** — Delivery module screens.
   - **`index.php`** — Lists past delivery dates.
@@ -187,9 +186,10 @@ A **controller** is the middleman between what the user wants and what the syste
 
 - **`reports/`** — Report viewers.
   - **`tabs.php`** — Shared row of tabs (Daily / Consolidated / Time-in) that appears on top of every report page.
-  - **`daily.php`** — Daily summary per kiosk (stock, deliveries, sales, expenses).
-  - **`consolidated.php`** — Weekly / monthly roll-up across all 5 kiosks.
-  - **`timein.php`** — Staff attendance / time-in log.
+  - **`daily.php`** — Daily summary per kiosk (stock, deliveries, sales, expenses). Uses **category sub-tabs** to slice the 33-product list, an **amber discrepancy banner** when stock counts don't reconcile, a live-updating **totals row**, and **client-side pagination** for big result sets.
+  - **`consolidated.php`** — Weekly / monthly roll-up across all 5 kiosks. The 3 overview cards (Total Sales / Total Expenses / Net Income) stay pinned at the top while **6 pill-shaped inner tabs** swap between Sales-by-Kiosk, Expenses-by-Kiosk, Daily Sales, Daily Expenses, Deliveries, and an Anomalies tab that only appears when there's something wrong. Per-kiosk rows include a **horizontal share-bar** for at-a-glance comparison.
+  - **`timein.php`** — Staff attendance / time-in log. Topped with **3 summary stat cards** (total check-ins, unique staff, kiosks with check-ins). Records are **grouped by date into collapsible sections** with an "Expand All / Collapse All" toggle, paginated 7 days at a time.
+  - **`_empty_state.php`** — Tiny shared partial (📊 icon + "No data" message) reused across the consolidated report's panels so the empty-state styling stays consistent.
 
 - **`admin/`** — Admin panel screens (Owner only).
   - **`users.php`** — Add/edit/deactivate user accounts.

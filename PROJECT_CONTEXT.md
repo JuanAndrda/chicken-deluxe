@@ -235,7 +235,7 @@ The system covers 5 kiosk kiosks:
 | Category | Key Requirements |
 |----------|-----------------|
 | **Performance** | Fast response on tablet devices; handle concurrent entries from 5 kiosks |
-| **Usability** | Clean minimal UI; max 2 clicks to reach core functions; error messages on invalid input |
+| **Usability** | Clean minimal UI; max 2 clicks to reach core functions; error messages on invalid input. Tablet-friendly entry forms (Inventory uses category sub-tabs + sticky Save bar + live progress; Reports use category/inner sub-tabs, totals rows, and per-table pagination so staff never have to scroll a flat 33-product or 100-row list) |
 | **Security** | RBAC enforced at all levels; encrypted passwords; atomic DB transactions |
 | **Reliability** | Daily auto-backup; no partial record saves; auto-lock reliability |
 | **Maintainability** | Well-documented code; modular architecture; version numbering |
@@ -475,7 +475,7 @@ WHERE TRIGGER_SCHEMA = 'chicken_deluxe';
 
 ---
 
-*Last updated: April 2026 — Generated from full project documentation, Group 7, BSIT 2-B*
+*Last updated: April 2026 (UI/UX pass for Inventory & Reports — tab layouts, sticky submit, pagination) — Group 7, BSIT 2-B*
 
 ---
 

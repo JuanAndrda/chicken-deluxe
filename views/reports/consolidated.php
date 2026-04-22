@@ -1,3 +1,15 @@
+<?php
+    /*
+     * Consolidated report view — pre-compute the per-kiosk shares so the
+     * bar visuals can be rendered server-side (one inline width per row).
+     * Everything else is just bucketed display, no business logic.
+     */
+    $max_kiosk_sales    = 0;
+    foreach (($sales_by_kiosk ?? []) as $s)    { $max_kiosk_sales    = max($max_kiosk_sales, (float) $s['Total_Sales']); }
+    $max_kiosk_expenses = 0;
+    foreach (($expense_by_kiosk ?? []) as $e)  { $max_kiosk_expenses = max($max_kiosk_expenses, (float) $e['Total_Expenses']); }
+    $has_anomalies = !empty($anomalies);
+?>
 <section class="reports">
     <div class="section-header">
         <h2>Reports</h2>
@@ -35,7 +47,7 @@
         </form>
     </div>
 
-    <!-- Overview Cards -->
+    <!-- Overview Cards (always visible) -->
     <div class="report-overview">
         <div class="card report-card">
             <h4>Total Sales</h4>
@@ -53,73 +65,109 @@
         </div>
     </div>
 
-    <!-- Sales by Kiosk -->
-    <div class="card">
+    <!-- Inner sub-tabs -->
+    <div class="report-inner-tabs" id="consolidatedInnerTabs" role="tablist">
+        <button type="button" class="report-inner-tab active" data-tab="sales-kiosk" role="tab">Sales by Kiosk</button>
+        <button type="button" class="report-inner-tab"        data-tab="exp-kiosk"   role="tab">Expenses by Kiosk</button>
+        <button type="button" class="report-inner-tab"        data-tab="daily-sales" role="tab">Daily Sales</button>
+        <button type="button" class="report-inner-tab"        data-tab="daily-exp"   role="tab">Daily Expenses</button>
+        <button type="button" class="report-inner-tab"        data-tab="deliveries"  role="tab">Deliveries</button>
+        <?php if ($has_anomalies): ?>
+            <button type="button" class="report-inner-tab has-anomaly" data-tab="anomalies" role="tab">Anomalies</button>
+        <?php endif; ?>
+    </div>
+
+    <!-- ======================= TAB 1: Sales by Kiosk ======================= -->
+    <div class="card report-inner-panel active" data-tab="sales-kiosk">
         <h3>Sales by Kiosk</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Kiosk</th>
-                        <th>Transactions</th>
-                        <th>Total Sales</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($sales_by_kiosk as $s): ?>
+        <?php if (empty($sales_by_kiosk)): ?>
+            <?php require __DIR__ . '/_empty_state.php'; ?>
+        <?php else: ?>
+            <div class="table-container">
+                <table>
+                    <thead>
                         <tr>
-                            <td><?= htmlspecialchars($s['Kiosk_Name']) ?></td>
-                            <td><?= $s['Total_Transactions'] ?></td>
-                            <td><strong>P<?= number_format($s['Total_Sales'], 2) ?></strong></td>
+                            <th>Kiosk</th>
+                            <th>Transactions</th>
+                            <th>Total Sales</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($sales_by_kiosk as $s): ?>
+                            <?php $pct = $max_kiosk_sales > 0 ? ($s['Total_Sales'] / $max_kiosk_sales) * 100 : 0; ?>
+                            <tr>
+                                <td><?= htmlspecialchars($s['Kiosk_Name']) ?></td>
+                                <td><?= $s['Total_Transactions'] ?></td>
+                                <td class="kiosk-bar-cell">
+                                    <div class="kiosk-bar-wrap">
+                                        <div class="kiosk-bar-bg">
+                                            <div class="kiosk-bar-fill" style="width:<?= number_format($pct, 1) ?>%"></div>
+                                        </div>
+                                        <strong>P<?= number_format($s['Total_Sales'], 2) ?></strong>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Expenses by Kiosk -->
-    <div class="card">
+    <!-- ======================= TAB 2: Expenses by Kiosk ===================== -->
+    <div class="card report-inner-panel" data-tab="exp-kiosk">
         <h3>Expenses by Kiosk</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Kiosk</th>
-                        <th>Entries</th>
-                        <th>Total Expenses</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($expense_by_kiosk as $e): ?>
+        <?php if (empty($expense_by_kiosk)): ?>
+            <?php require __DIR__ . '/_empty_state.php'; ?>
+        <?php else: ?>
+            <div class="table-container">
+                <table>
+                    <thead>
                         <tr>
-                            <td><?= htmlspecialchars($e['Kiosk_Name']) ?></td>
-                            <td><?= $e['Total_Entries'] ?></td>
-                            <td><strong>P<?= number_format($e['Total_Expenses'], 2) ?></strong></td>
+                            <th>Kiosk</th>
+                            <th>Entries</th>
+                            <th>Total Expenses</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($expense_by_kiosk as $e): ?>
+                            <?php $pct = $max_kiosk_expenses > 0 ? ($e['Total_Expenses'] / $max_kiosk_expenses) * 100 : 0; ?>
+                            <tr>
+                                <td><?= htmlspecialchars($e['Kiosk_Name']) ?></td>
+                                <td><?= $e['Total_Entries'] ?></td>
+                                <td class="kiosk-bar-cell">
+                                    <div class="kiosk-bar-wrap">
+                                        <div class="kiosk-bar-bg">
+                                            <div class="kiosk-bar-fill kiosk-bar-fill-expense" style="width:<?= number_format($pct, 1) ?>%"></div>
+                                        </div>
+                                        <strong>P<?= number_format($e['Total_Expenses'], 2) ?></strong>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Daily Sales Breakdown -->
-    <div class="card">
+    <!-- ======================= TAB 3: Daily Sales (paginated) =============== -->
+    <div class="card report-inner-panel" data-tab="daily-sales">
         <h3>Daily Sales Breakdown</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Kiosk</th>
-                        <th>Transactions</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($daily_sales)): ?>
-                        <tr><td colspan="4" class="text-center">No sales in this period.</td></tr>
-                    <?php else: ?>
+        <?php if (empty($daily_sales)): ?>
+            <?php require __DIR__ . '/_empty_state.php'; ?>
+        <?php else: ?>
+            <div class="table-container">
+                <table class="report-paginated" data-page-size="10">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Kiosk</th>
+                            <th>Transactions</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         <?php foreach ($daily_sales as $ds): ?>
                             <tr>
                                 <td><?= date('M j, Y', strtotime($ds['Sales_date'])) ?></td>
@@ -128,29 +176,34 @@
                                 <td><strong>P<?= number_format($ds['Day_Total'], 2) ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <div class="report-pagination" style="display:none;">
+                <button type="button" class="btn btn-sm btn-outline" data-page="prev">&laquo; Prev</button>
+                <span class="report-pagination-info"></span>
+                <button type="button" class="btn btn-sm btn-outline" data-page="next">Next &raquo;</button>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Daily Expense Breakdown -->
-    <div class="card">
+    <!-- ======================= TAB 4: Daily Expenses (paginated) ============ -->
+    <div class="card report-inner-panel" data-tab="daily-exp">
         <h3>Daily Expense Breakdown</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Kiosk</th>
-                        <th>Entries</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($daily_expenses)): ?>
-                        <tr><td colspan="4" class="text-center">No expenses in this period.</td></tr>
-                    <?php else: ?>
+        <?php if (empty($daily_expenses)): ?>
+            <?php require __DIR__ . '/_empty_state.php'; ?>
+        <?php else: ?>
+            <div class="table-container">
+                <table class="report-paginated" data-page-size="10">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Kiosk</th>
+                            <th>Entries</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         <?php foreach ($daily_expenses as $de): ?>
                             <tr>
                                 <td><?= date('M j, Y', strtotime($de['Expense_date'])) ?></td>
@@ -159,30 +212,35 @@
                                 <td><strong>P<?= number_format($de['Day_Total'], 2) ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <div class="report-pagination" style="display:none;">
+                <button type="button" class="btn btn-sm btn-outline" data-page="prev">&laquo; Prev</button>
+                <span class="report-pagination-info"></span>
+                <button type="button" class="btn btn-sm btn-outline" data-page="next">Next &raquo;</button>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Delivery Summary -->
-    <div class="card">
+    <!-- ======================= TAB 5: Deliveries (paginated) ================ -->
+    <div class="card report-inner-panel" data-tab="deliveries">
         <h3>Delivery Summary</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Kiosk</th>
-                        <th>Product</th>
-                        <th>Category</th>
-                        <th>Total Qty</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($deliveries)): ?>
-                        <tr><td colspan="5" class="text-center">No deliveries in this period.</td></tr>
-                    <?php else: ?>
+        <?php if (empty($deliveries)): ?>
+            <?php require __DIR__ . '/_empty_state.php'; ?>
+        <?php else: ?>
+            <div class="table-container">
+                <table class="report-paginated" data-page-size="10">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Kiosk</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Total Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         <?php foreach ($deliveries as $del): ?>
                             <tr>
                                 <td><?= date('M j, Y', strtotime($del['Delivery_Date'])) ?></td>
@@ -192,15 +250,20 @@
                                 <td><strong><?= $del['Total_Qty'] ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <div class="report-pagination" style="display:none;">
+                <button type="button" class="btn btn-sm btn-outline" data-page="prev">&laquo; Prev</button>
+                <span class="report-pagination-info"></span>
+                <button type="button" class="btn btn-sm btn-outline" data-page="next">Next &raquo;</button>
+            </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Anomalies -->
-    <?php if (!empty($anomalies)): ?>
-        <div class="card">
+    <!-- ======================= TAB 6: Anomalies (only if non-empty) ========= -->
+    <?php if ($has_anomalies): ?>
+        <div class="card report-inner-panel" data-tab="anomalies">
             <h3>Missing Inventory Snapshots</h3>
             <div class="table-container">
                 <table>
@@ -220,8 +283,8 @@
                                     <?php
                                         $missing = [];
                                         if ($a['has_beginning'] == 0) $missing[] = 'Beginning';
-                                        if ($a['has_ending'] == 0) $missing[] = 'Ending';
-                                        echo implode(' & ', $missing);
+                                        if ($a['has_ending'] == 0)    $missing[] = 'Ending';
+                                        echo implode(' &amp; ', $missing);
                                     ?>
                                 </td>
                             </tr>

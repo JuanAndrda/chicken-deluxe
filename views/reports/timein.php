@@ -1,3 +1,25 @@
+<?php
+    /*
+     * Time-in report view — group records by date and pre-compute summary
+     * stats. The controller still passes a flat $records array; we just
+     * rearrange it into date-keyed buckets for the collapsible UI.
+     */
+    $grouped     = [];
+    $unique_users  = [];
+    $unique_kiosks = [];
+    foreach (($records ?? []) as $r) {
+        $d = date('Y-m-d', strtotime($r['Timestamp']));
+        $grouped[$d][] = $r;
+        $unique_users[$r['Username']]   = true;
+        $unique_kiosks[$r['Kiosk_Name']] = true;
+    }
+    // Newest day first — matches how the flat list would have read.
+    krsort($grouped);
+
+    $total_checkins = count($records ?? []);
+    $total_users    = count($unique_users);
+    $total_kiosks   = count($unique_kiosks);
+?>
 <section class="reports">
     <div class="section-header">
         <h2>Reports</h2>
@@ -35,36 +57,81 @@
         </form>
     </div>
 
+    <!-- Summary stat cards -->
+    <div class="timein-stats">
+        <div class="timein-stat-card">
+            <div class="stat-value"><?= $total_checkins ?></div>
+            <div class="stat-label">Total Check-ins</div>
+        </div>
+        <div class="timein-stat-card">
+            <div class="stat-value"><?= $total_users ?></div>
+            <div class="stat-label">Unique Staff</div>
+        </div>
+        <div class="timein-stat-card">
+            <div class="stat-value"><?= $total_kiosks ?></div>
+            <div class="stat-label">Kiosks With Check-ins</div>
+        </div>
+    </div>
+
     <!-- Time-In Records -->
     <div class="card">
-        <h3>Staff Attendance Records</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Staff Name</th>
-                        <th>Username</th>
-                        <th>Kiosk</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($records)): ?>
-                        <tr><td colspan="5" class="text-center">No time-in records found for this period.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($records as $r): ?>
-                            <tr>
-                                <td><?= date('M j, Y', strtotime($r['Timestamp'])) ?></td>
-                                <td><?= date('g:i A', strtotime($r['Timestamp'])) ?></td>
-                                <td><?= htmlspecialchars($r['Full_name']) ?></td>
-                                <td><?= htmlspecialchars($r['Username']) ?></td>
-                                <td><?= htmlspecialchars($r['Kiosk_Name']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+        <div class="section-header">
+            <h3>Staff Attendance Records</h3>
+            <div class="section-header-right">
+                <?php if (!empty($grouped)): ?>
+                    <button type="button" class="btn btn-sm btn-outline" id="timeinToggleAll" data-state="expanded">
+                        Collapse All
+                    </button>
+                <?php endif; ?>
+            </div>
         </div>
+
+        <?php if (empty($grouped)): ?>
+            <p class="text-center text-light" style="padding:24px 0;">No time-in records found for this period.</p>
+        <?php else: ?>
+            <div class="timein-groups" id="timeinGroups">
+                <?php foreach ($grouped as $day => $rows): ?>
+                    <div class="timein-date-group">
+                        <div class="timein-date-header" data-toggle="timein-group">
+                            <span><?= date('l, F j, Y', strtotime($day)) ?>
+                                <span class="text-light">&middot; <?= count($rows) ?> check-in<?= count($rows) === 1 ? '' : 's' ?></span>
+                            </span>
+                            <span class="toggle-icon">&#9650;</span>
+                        </div>
+                        <div class="timein-date-body">
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Staff Name</th>
+                                            <th>Username</th>
+                                            <th>Kiosk</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($rows as $r): ?>
+                                            <tr>
+                                                <td><?= date('g:i A', strtotime($r['Timestamp'])) ?></td>
+                                                <td><?= htmlspecialchars($r['Full_name']) ?></td>
+                                                <td><?= htmlspecialchars($r['Username']) ?></td>
+                                                <td><?= htmlspecialchars($r['Kiosk_Name']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Date-level pagination (7 day-groups per page) -->
+            <div class="report-pagination" id="timeinPagination" style="display:none;">
+                <button type="button" class="btn btn-sm btn-outline" data-page="prev">&laquo; Prev</button>
+                <span class="report-pagination-info"></span>
+                <button type="button" class="btn btn-sm btn-outline" data-page="next">Next &raquo;</button>
+            </div>
+        <?php endif; ?>
     </div>
 </section>
