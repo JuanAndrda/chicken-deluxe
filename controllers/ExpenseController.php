@@ -140,6 +140,39 @@ class ExpenseController extends Controller
         }
     }
 
+    /** Update an expense record (owner only, unlocked records) */
+    public function update(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/expenses?error=Invalid+request');
+            return;
+        }
+
+        $expense_id  = (int) $this->post('expense_id');
+        $amount      = (float) $this->post('amount');
+        $description = trim($this->post('description', ''));
+        $date        = $this->post('date', date('Y-m-d'));
+
+        if ($amount <= 0 || $description === '') {
+            $this->redirect("/expenses?date={$date}&error=Amount+and+description+are+required");
+            return;
+        }
+
+        $updated = $this->expenseModel->update($expense_id, $amount, $description);
+        if ($updated) {
+            $this->auditLog->log(
+                Auth::userId(),
+                ACTION_UPDATE,
+                "Updated Expense ID:{$expense_id} — amount:{$amount}, desc:{$description}"
+            );
+            $this->redirect("/expenses?date={$date}&success=Expense+updated");
+        } else {
+            $this->redirect("/expenses?date={$date}&error=Cannot+update+a+locked+record");
+        }
+    }
+
     /** Determine which kiosk to use */
     private function resolveKiosk(): int
     {

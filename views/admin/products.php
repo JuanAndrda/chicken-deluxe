@@ -10,6 +10,23 @@
         <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
+    <?php
+        // Count active products that still have a 0.00 price
+        $zero_price_count = 0;
+        foreach ($products as $p) {
+            if ((int) $p['Active'] === 1 && (float) $p['Price'] <= 0) {
+                $zero_price_count++;
+            }
+        }
+    ?>
+    <?php if ($zero_price_count > 0): ?>
+        <div class="alert alert-warning">
+            ⚠ <strong><?= $zero_price_count ?></strong> active product<?= $zero_price_count === 1 ? '' : 's' ?>
+            still ha<?= $zero_price_count === 1 ? 's' : 've' ?> a price of ₱0.00.
+            Sales of these products will record as ₱0 line totals — set a price before they are sold.
+        </div>
+    <?php endif; ?>
+
     <!-- Add Product Form -->
     <div class="card form-card">
         <h3>Add New Product</h3>
@@ -138,10 +155,14 @@
                                 <input type="text" name="unit" form="<?= $fid ?>" class="form-input input-sm"
                                        value="<?= htmlspecialchars($product['Unit']) ?>" required>
                             </td>
-                            <td>
+                            <?php $priceWarn = ((int) $product['Active'] === 1 && (float) $product['Price'] <= 0); ?>
+                            <td class="<?= $priceWarn ? 'cell-price-warn' : '' ?>">
                                 <input type="number" name="price" form="<?= $fid ?>" class="form-input input-sm"
                                        min="0" step="0.01"
                                        value="<?= number_format((float) $product['Price'], 2, '.', '') ?>" required>
+                                <?php if ($priceWarn): ?>
+                                    <span class="price-warn-icon" title="Active product priced at ₱0.00">⚠</span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="badge <?= $product['Active'] ? 'badge-active' : 'badge-inactive' ?>">

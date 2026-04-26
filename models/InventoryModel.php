@@ -163,4 +163,149 @@ class InventoryModel extends Model
             [$kiosk_id, $limit]
         );
     }
+
+    /** Get beginning/ending snapshot status for all active kiosks on a given date */
+    public function getKioskInventoryStatus(string $date): array
+    {
+        return $this->db->read(
+            "SELECT k.Kiosk_ID, k.Name AS Kiosk_Name,
+                    MAX(CASE WHEN i.Snapshot_type = 'beginning' THEN 1 ELSE 0 END) AS has_beginning,
+                    MAX(CASE WHEN i.Snapshot_type = 'ending'    THEN 1 ELSE 0 END) AS has_ending
+             FROM Kiosk k
+             LEFT JOIN Inventory_Snapshot i
+                ON k.Kiosk_ID = i.Kiosk_ID
+               AND i.Snapshot_date = ?
+             WHERE k.Active = 1
+             GROUP BY k.Kiosk_ID, k.Name
+             ORDER BY k.Kiosk_ID",
+            [$date]
+        );
+    }
+
+    // ============================================================
+    // PERPETUAL INVENTORY — carry-forward & running-stock helpers
+    // ============================================================
+
+    /**
+     * Get the most recent LOCKED ending snapshot for a kiosk strictly before the given date.
+     * Only locked rows are used as carry-forward source so unfinalized counts can't propagate.
+     * Returns rows with Product_ID, Quantity, Snapshot_date, Product_Name, Unit, Category_Name.
+     */
+    public function getPreviousDayEnding(int $kiosk_id, string $date): array
+    {
+        // Find the most recent date with at least one locked ending row before $date
+        $row = $this->db->readOne(
+            "SELECT MAX(Snapshot_date) AS prev_date
+             FROM Inventory_Snapshot
+             WHERE Kiosk_ID = ?
+               AND Snapshot_date < ?
+               AND Snapshot_type = 'ending'
+               AND Locked_status = 1",
+            [$kiosk_id, $date]
+        );
+        $prev_date = $row['prev_date'] ?? null;
+        if (!$prev_date) {
+            return [];
+        }
+
+        return $this->db->read(
+            "SELECT i.Product_ID, i.Quantity, i.Snapshot_date,
+                    p.Name AS Product_Name, p.Unit, c.Name AS Category_Name
+             FROM Inventory_Snapshot i
+             JOIN Product  p ON i.Product_ID  = p.Product_ID
+             JOIN Category c ON p.Category_ID = c.Category_ID
+             WHERE i.Kiosk_ID = ?
+               AND i.Snapshot_date = ?
+               AND i.Snapshot_type = 'ending'
+               AND i.Locked_status = 1
+             ORDER BY c.Name, p.Name",
+            [$kiosk_id, $prev_date]
+        );
+    }
+
+    /**
+     * Auto-generate today's (or $date's) beginning stock by copying yesterday's locked ending.
+     * If no previous locked ending is found, seeds zeros for all active products.
+     * Returns the number of beginning rows inserted (0 means a duplicate existed and nothing was written).
+     */
+    public function autoGenerateBeginning(int $kiosk_id, int $user_id, string $date): int
+    {
+        // Don't overwrite an existing beginning for that date
+        $exists = $this->db->readOne(
+            "SELECT COUNT(*) AS cnt FROM Inventory_Snapshot
+             WHERE Kiosk_ID = ? AND Snapshot_date = ? AND Snapshot_type = 'beginning'",
+            [$kiosk_id, $date]
+        );
+        if (($exists['cnt'] ?? 0) > 0) {
+            return 0;
+        }
+
+        // Build quantities map from previous locked ending
+        $previous = $this->getPreviousDayEnding($kiosk_id, $date);
+        $quantities = [];
+
+        if (!empty($previous)) {
+            foreach ($previous as $row) {
+                $quantities[(int) $row['Product_ID']] = (int) $row['Quantity'];
+            }
+        } else {
+            // Fallback: seed zeros for every active product so the day is initialized
+            $products = $this->db->read(
+                "SELECT Product_ID FROM Product WHERE Active = 1"
+            );
+            foreach ($products as $p) {
+                $quantities[(int) $p['Product_ID']] = 0;
+            }
+        }
+
+        if (empty($quantities)) {
+            return 0;
+        }
+
+        return $this->createBatchSnapshots($kiosk_id, $user_id, 'beginning', $quantities, $date);
+    }
+
+    /**
+     * Compute running inventory per product for a given date and kiosk:
+     *   running = beginning + delivered_today - sold_today
+     * Returns one row per product that has a beginning snapshot for $date.
+     */
+    public function getRunningInventory(string $date, int $kiosk_id): array
+    {
+        return $this->db->read(
+            "SELECT
+                p.Product_ID,
+                p.Name           AS Product_Name,
+                p.Unit,
+                c.Name           AS Category_Name,
+                COALESCE(beg.Quantity, 0)         AS Beginning_Qty,
+                COALESCE(d.delivered, 0)          AS Delivered_Qty,
+                COALESCE(s.sold, 0)               AS Sold_Qty,
+                (COALESCE(beg.Quantity, 0)
+                 + COALESCE(d.delivered, 0)
+                 - COALESCE(s.sold, 0))           AS Running_Qty
+             FROM Product p
+             JOIN Category c ON p.Category_ID = c.Category_ID
+             INNER JOIN Inventory_Snapshot beg
+                    ON beg.Product_ID    = p.Product_ID
+                   AND beg.Kiosk_ID     = ?
+                   AND beg.Snapshot_date = ?
+                   AND beg.Snapshot_type = 'beginning'
+             LEFT JOIN (
+                    SELECT Product_ID, SUM(Quantity) AS delivered
+                    FROM Delivery
+                    WHERE Kiosk_ID = ? AND Delivery_Date = ?
+                    GROUP BY Product_ID
+                ) d ON d.Product_ID = p.Product_ID
+             LEFT JOIN (
+                    SELECT Product_ID, SUM(Quantity_sold) AS sold
+                    FROM Sales
+                    WHERE Kiosk_ID = ? AND Sales_date = ?
+                    GROUP BY Product_ID
+                ) s ON s.Product_ID = p.Product_ID
+             WHERE p.Active = 1
+             ORDER BY c.Name, p.Name",
+            [$kiosk_id, $date, $kiosk_id, $date, $kiosk_id, $date]
+        );
+    }
 }

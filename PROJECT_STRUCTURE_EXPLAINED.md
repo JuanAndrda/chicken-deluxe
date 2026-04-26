@@ -90,7 +90,7 @@ A **model** is a class that knows everything about *one specific topic* in the s
 
 ### Files inside
 
-- **`UserModel.php`** — Handles everything about user accounts: looking someone up by username (for login), creating new staff accounts, deactivating accounts, and listing all users.
+- **`UserModel.php`** — Handles everything about user accounts: looking someone up by username (for login), creating new staff accounts, **editing profile fields (`update`)**, **resetting passwords (`resetPassword`)**, deactivating/reactivating accounts, and listing all users (active-only or `getAll()` including deactivated).
 
 - **`RoleModel.php`** — Manages the three roles: Owner, Staff, and Auditor. It mostly just provides a list of available roles when an admin is creating a new user.
 
@@ -100,15 +100,15 @@ A **model** is a class that knows everything about *one specific topic* in the s
 
 - **`ProductModel.php`** — Manages the menu items the kiosks sell — names, units, prices, photos, and active status. The point-of-sale screens lean heavily on this model to display what's available.
 
-- **`InventoryModel.php`** — The most important model in the system. It records the daily snapshots of stock — what was on hand at the start of the day (`beginning`) and what was left at the end (`ending`). It also locks records when the day ends and unlocks them when the owner says so.
+- **`InventoryModel.php`** — The most important model in the system. It records the daily snapshots of stock — what was on hand at the start of the day (`beginning`) and what was left at the end (`ending`). It also locks records when the day ends and unlocks them when the owner says so. Now also supports **perpetual inventory**: `getPreviousDayEnding()` reads the prior day's ending stock, `autoGenerateBeginning()` creates today's beginning rows in one click using yesterday's ending values (carry-forward), `getRunningInventory()` computes live "beginning + delivered − sold" per product so staff can see what should be on hand right now, and `getKioskInventoryStatus()` powers the dashboard's per-kiosk readiness widget.
 
-- **`DeliveryModel.php`** — Records when fresh stock arrives at a kiosk. Each delivery is tied to a kiosk, a staff member, a product, and a date.
+- **`DeliveryModel.php`** — Records when fresh stock arrives at a kiosk. Each delivery is tied to a kiosk, a staff member, a product, and a date. `updateQuantity()` lets the Owner edit an unlocked delivery's quantity (rejected at the DB level if the row is already locked).
 
-- **`SalesModel.php`** — Records every sale. Each row is "this kiosk sold this product, this many units, at this price, on this date." The total amount is calculated automatically by a database trigger (more on that later).
+- **`SalesModel.php`** — Records every sale. Each row is "this kiosk sold this product, this many units, at this price, on this date." The total amount is calculated automatically by a database trigger (more on that later). `createBatch()` writes a whole POS cart in one transaction so a 6-item order is either fully saved or fully rolled back. `getDailyTotalByKiosk()` powers the Owner dashboard's per-kiosk day totals.
 
-- **`ExpenseModel.php`** — Tracks daily operating expenses per kiosk (transport, utilities, supplies, etc.).
+- **`ExpenseModel.php`** — Tracks daily operating expenses per kiosk (transport, utilities, supplies, etc.). `update()` lets the Owner edit an unlocked expense's amount or description inline.
 
-- **`AuditLogModel.php`** — The system's diary. Every important action (login, unlock, edit, delete) writes a line here so the owner can always see *who did what, and when*.
+- **`AuditLogModel.php`** — The system's diary. Every important action (login, unlock, edit, delete) writes a line here so the owner can always see *who did what, and when*. The `getAll()` method now accepts filters (date range, action type) plus pagination, and a companion `countAll()` returns the total row count so the Audit Log page can show "Showing 1–20 of 286" with proper Next/Prev buttons.
 
 - **`TimeInModel.php`** — Records when staff members start their shift. Helps the owner check attendance.
 
@@ -130,19 +130,19 @@ A **controller** is the middleman between what the user wants and what the syste
 
 - **`AuthController.php`** — Handles login and logout. When someone submits the login form, this controller checks the password, starts the session, and writes "user X logged in" to the Audit Log.
 
-- **`DashboardController.php`** — Builds the home page after login. Shows different summary widgets depending on whether the viewer is the Owner (sees all 5 kiosks) or Staff (sees only their kiosk).
+- **`DashboardController.php`** — Builds the home page after login. Now **fully role-aware**: `buildOwnerData()` assembles per-kiosk stat cards and a kiosk-status grid showing today's progress; `buildStaffData()` gives the kiosk staff a focused "your kiosk today" view with progress meters and a contextual "what's the next thing you should do" callout (record beginning stock, end the day, etc.); `buildAuditorData()` shows a minimal read-only landing.
 
-- **`InventoryController.php`** — Handles the daily inventory pages: showing today's snapshot, accepting beginning and ending stock entries, and (for the Owner) unlocking past records.
+- **`InventoryController.php`** — Handles the daily inventory pages: showing today's snapshot, accepting beginning and ending stock entries, and (for the Owner) unlocking past records. Adds `autoGenerateBeginning()` for the perpetual-inventory carry-forward — staff click one button and today's beginning rows are created from yesterday's ending values, audit-logged.
 
-- **`DeliveryController.php`** — Handles delivery entry pages: showing what was delivered today, accepting new delivery records, and locking past delivery days.
+- **`DeliveryController.php`** — Handles delivery entry pages: showing what was delivered today, accepting new delivery records, and locking past delivery days. Adds `update()` so the Owner can correct an unlocked delivery's quantity without deleting and re-creating the row.
 
-- **`SalesController.php`** — The point-of-sale screen. Lists all products with photos and prices, accepts quantities sold, and saves everything to the Sales table.
+- **`SalesController.php`** — The point-of-sale screen. Lists all products with photos and prices, accepts quantities sold, and saves everything to the Sales table. The original `store()` method handles single-row writes; the new `storeBatch()` handles the cart-based POS flow — a whole order (multiple products + quantities) is submitted in one POST and saved atomically through `SalesModel::createBatch()`.
 
-- **`ExpenseController.php`** — Handles daily expense entries: showing the day's expenses and accepting new ones.
+- **`ExpenseController.php`** — Handles daily expense entries: showing the day's expenses and accepting new ones. Adds `update()` for inline-editing an unlocked expense's amount or description.
 
 - **`ReportController.php`** — Builds the reports the Owner cares about: daily summaries per kiosk, consolidated weekly/monthly reports, and the staff time-in log.
 
-- **`AdminController.php`** — The Owner's admin panel. Manages users, products, kiosks, and the audit log viewer. This is the controller with the most "power" — only the Owner role is allowed to use it.
+- **`AdminController.php`** — The Owner's admin panel. Manages users, products, kiosks, and the audit log viewer. This is the controller with the most "power" — only the Owner role is allowed to use it. New methods: `editUser()` loads a user-edit form, `updateUser()` handles profile-field changes (role, kiosk, full name, username) with username-uniqueness validation, and `resetUserPassword()` lets the Owner force a new password without knowing the old one. `users()` and `kiosks()` now honor a `?show_all=1` flag so deactivated rows can be viewed and reactivated. `auditLog()` now supports date-range and action-type filtering plus server-side pagination (20 per page).
 
 ---
 
@@ -162,27 +162,26 @@ A **controller** is the middleman between what the user wants and what the syste
 
 - **`layouts/`** — The shared shell every page uses, so we don't repeat the navigation bar and header on every screen.
   - **`main.php`** — The HTML wrapper (the `<head>`, `<body>`, footer). Every other view is "wrapped" by this file.
-  - **`navbar.php`** — The top bar with the logo and the user's name.
-  - **`sidebar.php`** — The left-side menu that changes depending on the user's role (Owner sees more options, Staff sees less).
+  - **`navbar.php`** — The top bar with the logo and the user's full name (now uses `Auth::fullName()` instead of just the username).
+  - **`sidebar.php`** — The left-side menu that changes depending on the user's role (Owner sees more options, Staff sees less). Staff users now see a 📍 **kiosk badge** at the bottom showing which branch they're assigned to (uses `$_SESSION['kiosk_name']` cached at login).
 
 - **`auth/`** — Login screen.
   - **`login.php`** — The username/password form. The only page accessible without being logged in.
 
 - **`dashboard/`** — Home page after login.
-  - **`index.php`** — Welcomes the user and shows quick summary tiles.
+  - **`index.php`** — Now **role-aware**. Owner sees a multi-kiosk overview with stat cards (today's sales, units sold, etc.) and a kiosk-status grid showing which branches have started/closed their day. Staff sees a focused "your kiosk today" view with progress meters (beginning stock recorded? deliveries logged? etc.) and a contextual action callout that tells them the next thing to do. Auditor sees a minimal read-only landing.
 
 - **`inventory/`** — Inventory module screens.
-  - **`index.php`** — Tablet-friendly daily entry screen. Products are split into **category sub-tabs** (Burgers, Drinks, Hotdogs, Ricebowl, Snacks) so staff don't scroll a flat list of 33 items. Each row has finger-sized **+/− buttons**, a live **progress bar** ("X of 33 filled"), and a **sticky Save bar** anchored to the bottom of the screen so the submit button is always visible. The same tab layout is reused (read-only) for the saved/locked view of the day.
+  - **`index.php`** — Tablet-friendly daily entry screen. Products are split into **category sub-tabs** (Burgers, Drinks, Hotdogs, Ricebowl, Snacks) so staff don't scroll a flat list. Each row has finger-sized **+/− buttons**, a live **progress bar** ("X of 33 filled"), and a **sticky Save bar** anchored to the bottom of the screen. Now also shows the **perpetual inventory** features: a green ✓ "carry-forward" badge when today's beginning stock came from yesterday's ending, an "Auto-generate beginning" card that copies the previous day's ending values in one click, and a live **Running Inventory** widget computing `beginning + delivered − sold` per product so staff can see what's left right now.
 
 - **`delivery/`** — Delivery module screens.
-  - **`index.php`** — Lists past delivery dates.
-  - **`delivery.php`** — The form for entering a new delivery (product + quantity + date).
+  - **`index.php`** — **Tab-based layout** (`Add Delivery` + `Delivery Records (N)`). Add tab shows the full-width product grid with category pills; tapping a card slides a compact entry panel in **above** the grid (no horizontal scrolling). Records tab shows the records table with a Total Units indicator, Lock All button (Owner), and inline Edit rows for unlocked records. Auto-jumps to the Records tab right after a successful add. A **Recent Deliveries** quick-link card appears above the tabs.
 
 - **`sales/`** — Point-of-sale screen.
-  - **`index.php`** — A grid of products with photos, prices, and quantity boxes. This is where staff actually record sales.
+  - **`index.php`** — **Tab-based POS** (`New Order` + `Sales Records (N)`). New Order tab is a 65/35 split: full-width product grid on the left, persistent order cart on the right. Tapping a product adds it to the cart with a green qty badge on the card; cart shows live unit count and grand total, with +/-/× line controls. Confirm Order submits the whole cart in one transaction via `/sales/store-batch`. Records tab shows the day's sales with a Day Total strip, totals row at the bottom, Lock All (Owner), Delete/Unlock actions, and a 🧾 empty-state card with a "New Order" shortcut.
 
 - **`expenses/`** — Expense entry screen.
-  - **`index.php`** — Form for entering today's operating expenses, plus a list of past entries.
+  - **`index.php`** — Two-row form (description full width, amount + button below), record-count + total summary in the header, 🧾 empty-state card when no entries, and inline Edit rows for unlocked expenses (Owner can change description and amount without deleting).
 
 - **`reports/`** — Report viewers.
   - **`tabs.php`** — Shared row of tabs (Daily / Consolidated / Time-in) that appears on top of every report page.
@@ -192,10 +191,11 @@ A **controller** is the middleman between what the user wants and what the syste
   - **`_empty_state.php`** — Tiny shared partial (📊 icon + "No data" message) reused across the consolidated report's panels so the empty-state styling stays consistent.
 
 - **`admin/`** — Admin panel screens (Owner only).
-  - **`users.php`** — Add/edit/deactivate user accounts.
-  - **`products.php`** — Manage the menu (create, edit, upload photo, deactivate).
-  - **`kiosks.php`** — Manage the 5 kiosks (rename, change location, deactivate).
-  - **`audit-log.php`** — Viewer for the audit trail of all user actions.
+  - **`users.php`** — Add user form, list of users, per-row **Edit** button, and a "Show Deactivated" toggle so the Owner can reactivate accounts that were turned off. Deactivated rows are dimmed.
+  - **`edit-user.php`** — *(new this iteration)* Three-card edit page reached from the users list: **Profile** (role, kiosk, full name, username), **Reset Password** (Owner can force a new password without knowing the old one), and **Account Info** (read-only ID, status, role, kiosk, created date).
+  - **`products.php`** — Manage the menu (create, edit, upload photo, deactivate). Now flags **active products priced at ₱0.00** with a yellow ⚠ icon next to the price and a banner at the top of the page so the Owner can see at a glance which menu items still need a real price.
+  - **`kiosks.php`** — Manage the 5 kiosks. Each row has an **Edit** button that toggles an inline edit row (name + location); Activate/Deactivate stays as a separate action. Includes a "Show Inactive" toggle.
+  - **`audit-log.php`** — Viewer for the audit trail. Filterable by **date range**, **action type** (LOGIN / CREATE / UPDATE / DELETE / LOCK / UNLOCK / RECORD_UNLOCKED), with quick-filter pills (Today / This Week / Last 30 Days). Each row has an **expand button** that opens a side-by-side **OLD vs NEW JSON diff panel** populated by the change-logging triggers. Server-side paginated 20 per page with windowed `…` page navigation. Sort order is `Timestamp DESC, Log_ID DESC` so rows that share the same second still appear in deterministic insertion order.
 
 ---
 
@@ -234,6 +234,10 @@ A **controller** is the middleman between what the user wants and what the syste
 - **`migrations/`** — Folder of small "change scripts" that record specific updates to the database after the initial schema. Right now it contains `2026_rename_outlet_to_kiosk.sql`, which renamed the `Outlet_ID` column to `Kiosk_ID` everywhere. Each migration is dated and run once.
 
 - **`backups/`** — Folder of full database snapshots taken before risky operations, so we can restore if something breaks. Currently holds `backup_before_outlet_rename.sql`, the pre-rename safety net.
+
+- **`demo_reset.sql`** — Demo-prep script. Wipes every transactional table (Sales, Delivery, Expenses, Inventory_Snapshot, Time_in, Audit_Log) without touching users, kiosks, or products, then sets realistic Philippine kiosk prices on every product and reactivates them all. Re-runnable anytime to start a clean demo. The Audit_Log noise from the price UPDATEs is wiped at the end so the log starts empty.
+
+- **`demo_seed.sql`** — Companion to the reset script. Creates **5 staff users** (one per kiosk: `staff_k1` … `staff_k5`, all with password `staff1234`), then populates **yesterday** with a fully-locked operational day (inventory beginning + ending, deliveries, sales, expenses, time-in punches) and **today** with an open mid-day partial state (beginning inventory carried-forward from yesterday's ending, a few morning sales/deliveries/expenses, today's time-in). Wraps up with ~13 realistic-looking Audit_Log entries (logins, lock-all events) so the Audit Log page looks used. Workflow: `mysql -u root chicken_deluxe < sql/demo_reset.sql && mysql -u root chicken_deluxe < sql/demo_seed.sql`.
 
 ---
 

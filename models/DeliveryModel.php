@@ -73,4 +73,15 @@ class DeliveryModel extends Model
             [$delivery_id]
         );
     }
+
+    /** Update delivery quantity (only if unlocked) */
+    public function updateQuantity(int $delivery_id, int $quantity): int
+    {
+        return $this->db->write(
+            "UPDATE Delivery
+             SET Quantity = ?
+             WHERE Delivery_ID = ? AND Locked_status = 0",
+            [$quantity, $delivery_id]
+        );
+    }
 }

@@ -29,6 +29,7 @@ class Auth
         $_SESSION['username']   = $user['Username'];
         $_SESSION['role_id']    = $user['Role_ID'];
         $_SESSION['kiosk_id']  = $user['Kiosk_ID'];
+        $_SESSION['kiosk_name'] = $user['Kiosk_Name'] ?? null;
         $_SESSION['full_name']  = $user['Full_name'];
         $_SESSION['logged_in']  = true;
         $_SESSION['last_activity'] = time();

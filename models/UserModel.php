@@ -62,4 +62,35 @@ class UserModel extends Model
             [(int) $active, $user_id]
         );
     }
+
+    /** Update a user's profile (role, kiosk, full name, username) — does not change password */
+    public function update(int $user_id, int $role_id, ?int $kiosk_id, string $full_name, string $username): int
+    {
+        return $this->db->write(
+            "UPDATE User SET Role_ID = ?, Kiosk_ID = ?, Full_name = ?, Username = ? WHERE User_ID = ?",
+            [$role_id, $kiosk_id, $full_name, $username, $user_id]
+        );
+    }
+
+    /** Reset a user's password (hashes the new password) */
+    public function resetPassword(int $user_id, string $new_password): int
+    {
+        $hashed = password_hash($new_password, PASSWORD_BCRYPT);
+        return $this->db->write(
+            "UPDATE User SET Password = ? WHERE User_ID = ?",
+            [$hashed, $user_id]
+        );
+    }
+
+    /** Get every user (active + inactive) for admin management */
+    public function getAll(): array
+    {
+        return $this->db->read(
+            "SELECT u.*, r.Name AS Role_Name, k.Name AS Kiosk_Name
+             FROM User u
+             JOIN Role r ON u.Role_ID = r.Role_ID
+             LEFT JOIN Kiosk k ON u.Kiosk_ID = k.Kiosk_ID
+             ORDER BY u.Active_status DESC, u.User_ID"
+        );
+    }
 }

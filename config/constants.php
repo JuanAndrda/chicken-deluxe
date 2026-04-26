@@ -20,6 +20,10 @@ define('APP_NAME', 'Chicken Deluxe');
 define('APP_VERSION', '1.0.0');
 define('BASE_URL', '/chicken-deluxe');
 
+// -- Database ports (master-slave replication) --
+define('DB_MASTER_PORT', 3306);
+define('DB_SLAVE_PORT',  3307);
+
 // -- Session --
 define('SESSION_TIMEOUT', 1800); // 30 minutes of inactivity
 

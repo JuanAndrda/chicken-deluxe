@@ -38,21 +38,34 @@ class InventoryController extends Controller
         $has_ending    = !empty($ending);
         $is_today      = ($date === date('Y-m-d'));
 
+        // Perpetual-inventory carry-forward: peek at the most recent locked ending
+        // and compute today's running stock if a beginning exists.
+        $previous_ending     = $this->inventoryModel->getPreviousDayEnding($kiosk_id, $date);
+        $has_previous_ending = !empty($previous_ending);
+        $previous_date       = $has_previous_ending ? $previous_ending[0]['Snapshot_date'] : null;
+        $running_inventory   = $has_beginning
+            ? $this->inventoryModel->getRunningInventory($date, $kiosk_id)
+            : [];
+
         $data = [
-            'page_title'    => 'Inventory',
-            'kiosk'         => $kiosk,
-            'kiosk_id'     => $kiosk_id,
-            'date'          => $date,
-            'beginning'     => $beginning,
-            'ending'        => $ending,
-            'has_beginning' => $has_beginning,
-            'has_ending'    => $has_ending,
-            'is_today'      => $is_today,
-            'products'      => $this->productModel->getActiveGrouped(),
-            'kiosks'        => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'       => $this->inventoryModel->getRecordedDates($kiosk_id),
-            'success'       => $_GET['success'] ?? null,
-            'error'         => $_GET['error'] ?? null,
+            'page_title'          => 'Inventory',
+            'kiosk'               => $kiosk,
+            'kiosk_id'            => $kiosk_id,
+            'date'                => $date,
+            'beginning'           => $beginning,
+            'ending'              => $ending,
+            'has_beginning'       => $has_beginning,
+            'has_ending'          => $has_ending,
+            'is_today'            => $is_today,
+            'products'            => $this->productModel->getActiveGrouped(),
+            'kiosks'              => Auth::isOwner() ? $this->kioskModel->getActive() : [],
+            'history'             => $this->inventoryModel->getRecordedDates($kiosk_id),
+            'previous_ending'     => $previous_ending,
+            'has_previous_ending' => $has_previous_ending,
+            'previous_date'       => $previous_date,
+            'running_inventory'   => $running_inventory,
+            'success'             => $_GET['success'] ?? null,
+            'error'               => $_GET['error'] ?? null,
         ];
 
         $this->render('inventory/index', $data);
@@ -114,6 +127,60 @@ class InventoryController extends Controller
             $this->redirect("/inventory?date={$date}&success={$label}+stock+recorded+successfully+({$count}+products)");
         } catch (\Exception $e) {
             $this->redirect('/inventory?error=Failed+to+save:+' . urlencode($e->getMessage()));
+        }
+    }
+
+    /**
+     * Auto-generate today's beginning stock from yesterday's locked ending.
+     * Falls back to zeros if no previous locked ending exists.
+     */
+    public function autoGenerateBeginning(): void
+    {
+        Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/inventory?error=Invalid+request');
+            return;
+        }
+
+        $kiosk_id = $this->resolveKiosk();
+        $date     = $this->post('date', date('Y-m-d'));
+
+        // Block if a beginning already exists for that day
+        if ($this->inventoryModel->hasBeginningToday($kiosk_id) && $date === date('Y-m-d')) {
+            $this->redirect('/inventory?error=Beginning+stock+already+recorded+today');
+            return;
+        }
+
+        try {
+            // Look up previous ending up-front so we can include it in the audit detail
+            $previous = $this->inventoryModel->getPreviousDayEnding($kiosk_id, $date);
+            $prev_date = !empty($previous) ? $previous[0]['Snapshot_date'] : null;
+
+            $count = $this->inventoryModel->autoGenerateBeginning(
+                $kiosk_id, Auth::userId(), $date
+            );
+
+            if ($count === 0) {
+                $this->redirect("/inventory?date={$date}&error=Auto-generate+failed:+nothing+to+create");
+                return;
+            }
+
+            if ($prev_date) {
+                $detail = "Beginning stock auto-generated from {$prev_date} ending: "
+                        . "{$count} products for kiosk {$kiosk_id} on {$date}";
+            } else {
+                $detail = "Beginning stock auto-generated (no previous ending found, seeded zeros): "
+                        . "{$count} products for kiosk {$kiosk_id} on {$date}";
+            }
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, $detail);
+
+            $msg = $prev_date
+                ? "Beginning+stock+auto-generated+from+{$prev_date}+({$count}+products)"
+                : "Beginning+stock+initialized+with+zeros+({$count}+products)";
+            $this->redirect("/inventory?date={$date}&success={$msg}");
+        } catch (\Exception $e) {
+            $this->redirect('/inventory?error=Auto-generate+failed:+' . urlencode($e->getMessage()));
         }
     }
 

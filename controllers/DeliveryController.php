@@ -143,6 +143,38 @@ class DeliveryController extends Controller
         }
     }
 
+    /** Update delivery quantity (owner only, unlocked records) */
+    public function update(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/delivery?error=Invalid+request');
+            return;
+        }
+
+        $delivery_id = (int) $this->post('delivery_id');
+        $quantity    = (int) $this->post('quantity');
+        $date        = $this->post('date', date('Y-m-d'));
+
+        if ($quantity <= 0) {
+            $this->redirect("/delivery?date={$date}&error=Quantity+must+be+greater+than+zero");
+            return;
+        }
+
+        $updated = $this->deliveryModel->updateQuantity($delivery_id, $quantity);
+        if ($updated) {
+            $this->auditLog->log(
+                Auth::userId(),
+                ACTION_UPDATE,
+                "Updated Delivery ID:{$delivery_id} quantity to {$quantity}"
+            );
+            $this->redirect("/delivery?date={$date}&success=Delivery+updated");
+        } else {
+            $this->redirect("/delivery?date={$date}&error=Cannot+update+a+locked+record");
+        }
+    }
+
     /** Determine which kiosk to use */
     private function resolveKiosk(): int
     {

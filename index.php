@@ -31,6 +31,9 @@ $router->get('/dashboard', 'DashboardController', 'index');
 $router->get('/admin',                'AdminController', 'users');
 $router->get('/admin/users',          'AdminController', 'users');
 $router->post('/admin/users/create',  'AdminController', 'createUser');
+$router->get('/admin/users/edit',     'AdminController', 'editUser');
+$router->post('/admin/users/update',  'AdminController', 'updateUser');
+$router->post('/admin/users/reset-password', 'AdminController', 'resetUserPassword');
 $router->post('/admin/users/deactivate', 'AdminController', 'deactivateUser');
 $router->post('/admin/users/activate',   'AdminController', 'activateUser');
 $router->get('/admin/products',          'AdminController', 'products');
@@ -44,6 +47,7 @@ $router->get('/admin/audit-log',         'AdminController', 'auditLog');
 // -- Inventory routes --
 $router->get('/inventory',        'InventoryController', 'index');
 $router->post('/inventory/store', 'InventoryController', 'store');
+$router->post('/inventory/auto-generate', 'InventoryController', 'autoGenerateBeginning');
 $router->post('/inventory/unlock', 'InventoryController', 'unlock');
 
 // -- Delivery routes --
@@ -52,10 +56,12 @@ $router->post('/delivery/store',   'DeliveryController', 'store');
 $router->post('/delivery/lock',    'DeliveryController', 'lock');
 $router->post('/delivery/unlock',  'DeliveryController', 'unlock');
 $router->post('/delivery/delete',  'DeliveryController', 'delete');
+$router->post('/delivery/update',  'DeliveryController', 'update');
 
 // -- Sales routes --
 $router->get('/sales',          'SalesController', 'index');
 $router->post('/sales/store',   'SalesController', 'store');
+$router->post('/sales/store-batch', 'SalesController', 'storeBatch');
 $router->post('/sales/lock',    'SalesController', 'lock');
 $router->post('/sales/unlock',  'SalesController', 'unlock');
 $router->post('/sales/delete',  'SalesController', 'delete');
@@ -66,6 +72,7 @@ $router->post('/expenses/store',   'ExpenseController', 'store');
 $router->post('/expenses/lock',    'ExpenseController', 'lock');
 $router->post('/expenses/unlock',  'ExpenseController', 'unlock');
 $router->post('/expenses/delete',  'ExpenseController', 'delete');
+$router->post('/expenses/update',  'ExpenseController', 'update');
 
 // -- Reports routes --
 $router->get('/reports',              'ReportController', 'index');

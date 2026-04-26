@@ -589,6 +589,24 @@ The schema seeds the data we know is fixed at install time:
 
 All seeds use `ON DUPLICATE KEY UPDATE` so re-running `schema.sql` is safe — it won't fail or overwrite valid edits.
 
+## 3.6 Demo / Reset Scripts
+
+Two convenience scripts live alongside `schema.sql` for demo prep — neither changes the schema, both are idempotent:
+
+| File | What it does | Touches |
+|---|---|---|
+| `sql/demo_reset.sql` | TRUNCATEs every transactional table (Sales, Delivery, Expenses, Inventory_Snapshot, Time_in, Audit_Log), resets their AUTO_INCREMENT counters, sets realistic Philippine kiosk prices on every product (₱45–₱85 burgers, ₱35–₱45 hotdogs, ₱65–₱85 ricebowls, ₱18–₱35 drinks, ₱20–₱35 snacks), and ensures every product is `Active = 1`. Final step: a second `TRUNCATE Audit_Log` to drop the noise rows that the price-update triggers just generated. Result: clean transactional state, intact reference data. | Sales / Delivery / Expenses / Inventory_Snapshot / Time_in / Audit_Log / Product (price + active) |
+| `sql/demo_seed.sql` | Inserts 5 staff users (one per kiosk: `staff_k1` … `staff_k5`, all with bcrypt-hashed password `staff1234`), then populates **yesterday** with a fully-locked operational day (10 popular products × 5 kiosks × beginning + ending = 100 inventory rows, ~12 deliveries, ~54 sales, ~12 expenses, 5 time-in punches) and **today** with an open mid-day partial state (50 carry-forward beginning inventory rows = yesterday's ending values, 5 morning deliveries, ~27 sales, 2 expenses, 5 time-in punches). Wraps up by truncating the trigger-generated Audit_Log rows and inserting ~13 manual-looking entries (logins, lock-all events). | User / Sales / Delivery / Expenses / Inventory_Snapshot / Time_in / Audit_Log |
+
+**Recommended workflow** to start a clean demo:
+
+```bash
+mysql -u root chicken_deluxe < sql/demo_reset.sql
+mysql -u root chicken_deluxe < sql/demo_seed.sql
+```
+
+**Why both scripts truncate Audit_Log at the end:** every INSERT into the seven main tables fires a `trg_log_<table>_insert` trigger, which writes a row into `Audit_Log`. After a fresh seed, that's ~270 rows of trigger noise. Both scripts wipe Audit_Log as the final step so the audit log starts clean (or, in `demo_seed.sql`, contains only the 13 hand-crafted login/lock entries).
+
 ---
 ---
 

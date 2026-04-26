@@ -43,6 +43,17 @@ The system covers 5 kiosk kiosks:
 | **Auditor** | Optional reviewer | Read-only access to all records. Cannot modify anything. |
 | **System Developer** | Juan (you) | Development, testing, deployment, maintenance |
 
+### Demo accounts (seeded by `sql/demo_seed.sql`)
+
+| Username | Password | Role | Kiosk |
+|---|---|---|---|
+| `owner` | (existing) | Owner | (all) |
+| `staff_k1` | `staff1234` | Staff | Tagbak Branch |
+| `staff_k2` | `staff1234` | Staff | Atrium Branch |
+| `staff_k3` | `staff1234` | Staff | City Proper Branch |
+| `staff_k4` | `staff1234` | Staff | Supermart Branch |
+| `staff_k5` | `staff1234` | Staff | Aldeguer Branch |
+
 ---
 
 ## 4. SYSTEM MODULES (6 Processes)
@@ -475,7 +486,39 @@ WHERE TRIGGER_SCHEMA = 'chicken_deluxe';
 
 ---
 
-*Last updated: April 2026 (UI/UX pass for Inventory & Reports — tab layouts, sticky submit, pagination) — Group 7, BSIT 2-B*
+*Last updated: April 2026 (UI/UX pass for Inventory & Reports — tab layouts, sticky submit, pagination; followed by perpetual-inventory + cart-POS + tab redesign + demo seed pass) — Group 7, BSIT 2-B*
+
+---
+
+## 14. RECENT FEATURE ADDITIONS (April 2026 second pass)
+
+These were added on top of the schema described above. **No schema changes** — only new model methods, controller methods, routes, and views.
+
+| Area | Addition |
+|---|---|
+| **Inventory** | Perpetual-inventory carry-forward: today's `beginning` snapshot can be one-click generated from yesterday's `ending`. Live "running inventory" widget computes `beginning + delivered − sold` per product. Route: `POST /inventory/auto-generate`. |
+| **Sales POS** | Cart-based ordering — staff build a multi-product cart, then `Confirm Order` submits the whole order in one transaction via `SalesModel::createBatch()`. Route: `POST /sales/store-batch`. The Sales page is now a tab layout (`New Order` ⇄ `Sales Records (N)`). |
+| **Delivery** | Tab layout (`Add Delivery` ⇄ `Delivery Records (N)`); compact entry panel above the product grid; inline Edit button for unlocked rows. Route: `POST /delivery/update` (Owner only). |
+| **Expenses** | Two-row entry form, summary header (`N records · Total: ₱X`), 🧾 empty state, inline Edit. Route: `POST /expenses/update` (Owner only). |
+| **Admin / Users** | New edit-user page (`GET /admin/users/edit`) with three cards: Profile, Reset Password, Account Info. New routes: `POST /admin/users/update` and `POST /admin/users/reset-password`. `?show_all=1` toggle to see deactivated users. |
+| **Admin / Kiosks** | Inline-edit row for name + location; `?show_all=1` to see inactive kiosks. |
+| **Admin / Products** | Banner + ⚠ icon flagging active products priced at ₱0.00. |
+| **Admin / Audit Log** | Date-range + action-type filters, quick-filter pills (Today / Week / 30 Days), expandable OLD vs NEW JSON diff panels per row, server-side pagination (20/page), deterministic `Timestamp DESC, Log_ID DESC` ordering. |
+| **Dashboard** | Role-aware: Owner sees multi-kiosk stat cards + status grid; Staff sees own-kiosk progress + contextual "what's next" callout; Auditor sees minimal landing. |
+| **Layout polish** | Login auto-stores `kiosk_name` in session; sidebar shows 📍 kiosk badge for staff; navbar shows full name (not just username). |
+
+### Demo / reset SQL scripts
+
+| File | Purpose |
+|---|---|
+| `sql/demo_reset.sql` | Wipes all transactional tables (Sales, Delivery, Expenses, Inventory_Snapshot, Time_in, Audit_Log) and resets all product prices to realistic Philippine kiosk values. Keeps users, kiosks, categories, and products intact. Re-runnable. |
+| `sql/demo_seed.sql` | Companion to the reset script. Adds 5 staff users (one per kiosk), seeds yesterday with a fully-locked operational day (inventory begin+end, deliveries, sales, expenses, time-in punches), and today with an open mid-day partial state (carry-forward beginning inventory, morning sales, etc.). Wraps up with ~13 sample audit-log entries. |
+
+**Workflow to start a clean demo:**
+```
+mysql -u root chicken_deluxe < sql/demo_reset.sql
+mysql -u root chicken_deluxe < sql/demo_seed.sql
+```
 
 ---
 

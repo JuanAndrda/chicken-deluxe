@@ -1,13 +1,15 @@
 <?php
 /**
  * Database Configuration
- * Master (writes) on port 3306, Slave (reads) on port 3307
+ * Master (writes) on DB_MASTER_PORT, Slave (reads) on DB_SLAVE_PORT.
+ * Port numbers come from config/constants.php so there's a single
+ * source of truth.
  */
 
 return [
     'master' => [
         'host'     => '127.0.0.1',
-        'port'     => 3306,
+        'port'     => DB_MASTER_PORT,
         'dbname'   => 'chicken_deluxe',
         'username' => 'root',
         'password' => '',
@@ -15,7 +17,7 @@ return [
     ],
     'slave' => [
         'host'     => '127.0.0.1',
-        'port'     => 3307,
+        'port'     => DB_SLAVE_PORT,
         'dbname'   => 'chicken_deluxe',
         'username' => 'root',
         'password' => '',

@@ -39,11 +39,18 @@
             <a href="<?= BASE_URL ?>/admin/users"    class="nav-link nav-sub <?= isActive('/admin/users', $current_path) ?: (isActive('/admin', $current_path) && $current_path === '/admin' ? 'active' : '') ?>">Users</a>
             <a href="<?= BASE_URL ?>/admin/products" class="nav-link nav-sub <?= isActive('/admin/products', $current_path) ?>">Products</a>
             <a href="<?= BASE_URL ?>/admin/kiosks"   class="nav-link nav-sub <?= isActive('/admin/kiosks', $current_path) ?>">Kiosks</a>
+            <a href="<?= BASE_URL ?>/admin/audit-log" class="nav-link nav-sub <?= isActive('/admin/audit-log', $current_path) ?>">Audit Log</a>
         <?php endif; ?>
     </nav>
 
     <div class="sidebar-footer">
         <span class="sidebar-user"><?= htmlspecialchars(Auth::fullName() ?? '') ?></span>
         <span class="sidebar-role"><?= ROLE_NAMES[Auth::roleId()] ?? '' ?></span>
+        <?php if (Auth::isStaff() && Auth::kioskId()): ?>
+            <span class="sidebar-kiosk">
+                &#128205;
+                <?= htmlspecialchars($_SESSION['kiosk_name'] ?? 'Kiosk ' . Auth::kioskId()) ?>
+            </span>
+        <?php endif; ?>
     </div>
 </aside>

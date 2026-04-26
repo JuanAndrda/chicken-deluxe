@@ -83,4 +83,18 @@ class ExpenseModel extends Model
             [$expense_id]
         );
     }
+
+    /** Update an expense record (only if unlocked) */
+    public function update(
+        int    $expense_id,
+        float  $amount,
+        string $description
+    ): int {
+        return $this->db->write(
+            "UPDATE Expenses
+             SET Amount = ?, Description = ?
+             WHERE Expense_ID = ? AND Locked_status = 0",
+            [$amount, $description, $expense_id]
+        );
+    }
 }

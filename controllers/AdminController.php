@@ -38,16 +38,118 @@ class AdminController extends Controller
     {
         Auth::requireRole([ROLE_OWNER]);
 
+        // ?show_all=1 includes deactivated users so the owner can reactivate them
+        $show_all = (bool) $this->get('show_all', 0);
+
         $data = [
             'page_title' => 'Manage Users',
-            'users'      => $this->userModel->getAllActive(),
+            'users'      => $show_all ? $this->userModel->getAll() : $this->userModel->getAllActive(),
+            'roles'      => $this->roleModel->getAll(),
+            'kiosks'     => $this->kioskModel->getActive(),
+            'show_all'   => $show_all,
+            'success'    => $_GET['success'] ?? null,
+            'error'      => $_GET['error'] ?? null,
+        ];
+
+        $this->render('admin/users', $data);
+    }
+
+    /** Show edit-user page (profile + password reset) */
+    public function editUser(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        $user_id = (int) $this->get('id', 0);
+        $user    = $user_id ? $this->userModel->findById($user_id) : null;
+
+        if (!$user) {
+            $this->redirect('/admin/users?error=User+not+found');
+            return;
+        }
+
+        $data = [
+            'page_title' => 'Edit User',
+            'user'       => $user,
             'roles'      => $this->roleModel->getAll(),
             'kiosks'     => $this->kioskModel->getActive(),
             'success'    => $_GET['success'] ?? null,
             'error'      => $_GET['error'] ?? null,
         ];
 
-        $this->render('admin/users', $data);
+        $this->render('admin/edit-user', $data);
+    }
+
+    /** Handle update user (profile fields only) */
+    public function updateUser(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/admin/users?error=Invalid+request');
+            return;
+        }
+
+        $user_id = (int) $this->post('user_id');
+        if ($user_id <= 0) {
+            $this->redirect('/admin/users?error=Invalid+user');
+            return;
+        }
+
+        if (!$this->requirePost(['username', 'full_name', 'role_id'])) {
+            $this->redirect('/admin/users/edit?id=' . $user_id . '&error=All+fields+are+required');
+            return;
+        }
+
+        $username  = trim($this->post('username'));
+        $full_name = trim($this->post('full_name'));
+        $role_id   = (int) $this->post('role_id');
+        $kiosk_id  = $this->post('kiosk_id') ? (int) $this->post('kiosk_id') : null;
+
+        // Staff must have an assigned kiosk
+        if ($role_id === ROLE_STAFF && $kiosk_id === null) {
+            $this->redirect('/admin/users/edit?id=' . $user_id . '&error=Staff+must+be+assigned+to+a+kiosk');
+            return;
+        }
+
+        // Username uniqueness — only if changed to a name owned by another user
+        $existing = $this->userModel->findByUsername($username);
+        if ($existing && (int) $existing['User_ID'] !== $user_id) {
+            $this->redirect('/admin/users/edit?id=' . $user_id . '&error=Username+already+exists');
+            return;
+        }
+
+        $this->userModel->update($user_id, $role_id, $kiosk_id, $full_name, $username);
+        $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Updated user ID:{$user_id} ({$username})");
+
+        $this->redirect('/admin/users/edit?id=' . $user_id . '&success=Profile+updated');
+    }
+
+    /** Handle password reset for a user */
+    public function resetUserPassword(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/admin/users?error=Invalid+request');
+            return;
+        }
+
+        $user_id      = (int) $this->post('user_id');
+        $new_password = $this->post('new_password', '');
+
+        if ($user_id <= 0) {
+            $this->redirect('/admin/users?error=Invalid+user');
+            return;
+        }
+        if (strlen($new_password) < 4) {
+            $this->redirect('/admin/users/edit?id=' . $user_id . '&error=Password+must+be+at+least+4+characters');
+            return;
+        }
+
+        $this->userModel->resetPassword($user_id, $new_password);
+        $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Reset password for user ID:{$user_id}");
+
+        $this->redirect('/admin/users/edit?id=' . $user_id . '&success=Password+reset+successfully');
     }
 
     /** Handle create user form */
@@ -317,9 +419,14 @@ class AdminController extends Controller
     {
         Auth::requireRole([ROLE_OWNER]);
 
+        // ?show_all=1 includes inactive kiosks
+        $show_all = (bool) $this->get('show_all', 0);
+        $kiosks   = $show_all ? $this->kioskModel->getAll() : $this->kioskModel->getActive();
+
         $data = [
             'page_title' => 'Manage Kiosks',
-            'kiosks'     => $this->kioskModel->getAll(),
+            'kiosks'     => $kiosks,
+            'show_all'   => $show_all,
             'success'    => $_GET['success'] ?? null,
             'error'      => $_GET['error'] ?? null,
         ];
@@ -376,19 +483,32 @@ class AdminController extends Controller
     // AUDIT LOG
     // ============================
 
-    /** Show audit log page */
+    /** Show audit log page — filtered, paginated */
     public function auditLog(): void
     {
         Auth::requireRole([ROLE_OWNER]);
 
         $from_date = $this->get('from_date');
         $to_date   = $this->get('to_date');
+        $action    = $this->get('action', '');
+        $page      = max(1, (int) ($this->get('page', 1)));
+        $per_page  = 20;
+
+        $total_rows  = $this->auditLog->countAll(null, $from_date, $to_date, $action ?: null);
+        $total_pages = max(1, (int) ceil($total_rows / $per_page));
+        $page        = min($page, $total_pages);
+        $offset      = ($page - 1) * $per_page;
 
         $data = [
-            'page_title' => 'Audit Log',
-            'logs'       => $this->auditLog->getAll(null, $from_date, $to_date),
-            'from_date'  => $from_date,
-            'to_date'    => $to_date,
+            'page_title'   => 'Audit Log',
+            'logs'         => $this->auditLog->getAll(null, $from_date, $to_date, $action ?: null, $per_page, $offset),
+            'from_date'    => $from_date,
+            'to_date'      => $to_date,
+            'action'       => $action,
+            'total_rows'   => $total_rows,
+            'total_pages'  => $total_pages,
+            'current_page' => $page,
+            'per_page'     => $per_page,
         ];
 
         $this->render('admin/audit-log', $data);

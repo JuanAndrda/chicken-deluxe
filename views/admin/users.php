@@ -57,6 +57,17 @@
         </form>
     </div>
 
+    <!-- Show Deactivated toggle -->
+    <div class="admin-toggle-row">
+        <?php if (!empty($show_all)): ?>
+            <a href="<?= BASE_URL ?>/admin/users" class="btn btn-sm btn-outline">Hide Deactivated</a>
+            <span class="text-muted">Showing all users (active + deactivated).</span>
+        <?php else: ?>
+            <a href="<?= BASE_URL ?>/admin/users?show_all=1" class="btn btn-sm btn-outline">Show Deactivated</a>
+            <span class="text-muted">Showing active users only.</span>
+        <?php endif; ?>
+    </div>
+
     <!-- Users Table -->
     <div class="table-container">
         <table>
@@ -77,7 +88,7 @@
                     <tr><td colspan="8" class="text-center">No users found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($users as $user): ?>
-                        <tr>
+                        <tr class="<?= $user['Active_status'] ? '' : 'row-inactive' ?>">
                             <td><?= $user['User_ID'] ?></td>
                             <td><?= htmlspecialchars($user['Full_name']) ?></td>
                             <td><?= htmlspecialchars($user['Username']) ?></td>
@@ -91,6 +102,8 @@
                             <td><?= date('M j, Y', strtotime($user['Created_at'])) ?></td>
                             <td>
                                 <?php if ($user['User_ID'] !== Auth::userId()): ?>
+                                    <a href="<?= BASE_URL ?>/admin/users/edit?id=<?= $user['User_ID'] ?>"
+                                       class="btn btn-sm btn-primary">Edit</a>
                                     <form method="POST" action="<?= BASE_URL ?>/admin/users/<?= $user['Active_status'] ? 'deactivate' : 'activate' ?>" class="inline-form">
                                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                         <input type="hidden" name="user_id" value="<?= $user['User_ID'] ?>">

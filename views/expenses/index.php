@@ -52,11 +52,11 @@
         </div>
     <?php endif; ?>
 
-    <!-- Add Expense Form -->
+    <!-- Add Expense Form (two-row layout) -->
     <?php if ($is_today && !$any_locked): ?>
         <div class="card form-card">
             <h3>Record Expense</h3>
-            <form method="POST" action="<?= BASE_URL ?>/expenses/store" class="form-inline-row">
+            <form method="POST" action="<?= BASE_URL ?>/expenses/store" class="expense-entry-form">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                 <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
                 <input type="hidden" name="date" value="<?= $date ?>">
@@ -64,28 +64,37 @@
                 <div class="form-group">
                     <label for="description">Description</label>
                     <input type="text" id="description" name="description" class="form-input"
-                           placeholder="e.g. LPG refill, paper cups" required>
+                           placeholder="e.g. LPG refill, paper cups, transport" required>
                 </div>
 
-                <div class="form-group">
-                    <label for="amount">Amount (P)</label>
-                    <input type="number" id="amount" name="amount" class="form-input input-sm"
-                           min="0.01" step="0.01" required>
-                </div>
-
-                <div class="form-group form-actions">
-                    <button type="submit" class="btn btn-primary">Add Expense</button>
+                <div class="expense-entry-bottom">
+                    <div class="form-group" style="flex:0 0 160px;">
+                        <label for="amount">Amount (₱)</label>
+                        <input type="number" id="amount" name="amount" class="form-input"
+                               min="0.01" step="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group form-actions" style="align-self:flex-end;">
+                        <button type="submit" class="btn btn-primary">Add Expense</button>
+                    </div>
                 </div>
             </form>
         </div>
     <?php endif; ?>
 
-    <!-- Expenses Table -->
+    <!-- Expenses Records -->
     <div class="card">
         <div class="section-header">
             <h3>Expense Records</h3>
             <div class="section-header-right">
-                <span class="total-display">Day Total: <strong>P<?= number_format($day_total, 2) ?></strong></span>
+                <div class="expense-summary">
+                    <span class="expense-count">
+                        <?= count($expenses) ?> record<?= count($expenses) == 1 ? '' : 's' ?>
+                    </span>
+                    <span class="expense-divider">·</span>
+                    <span class="total-display">
+                        Total: <strong>P<?= number_format($day_total, 2) ?></strong>
+                    </span>
+                </div>
                 <?php if (!empty($expenses) && !$any_locked && $is_today && Auth::isOwner()): ?>
                     <form method="POST" action="<?= BASE_URL ?>/expenses/lock" class="inline-form">
                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
@@ -106,22 +115,29 @@
             </div>
         </div>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Description</th>
-                        <th>Amount</th>
-                        <th>Recorded By</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                        <?php if (Auth::isOwner()): ?><th>Action</th><?php endif; ?>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($expenses)): ?>
-                        <tr><td colspan="<?= Auth::isOwner() ? 6 : 5 ?>" class="text-center">No expenses recorded for this date.</td></tr>
-                    <?php else: ?>
+        <?php if (empty($expenses)): ?>
+            <div class="empty-state-card">
+                <div class="empty-state-icon">🧾</div>
+                <div class="empty-state-text">No expenses recorded</div>
+                <div class="empty-state-sub">
+                    Add your first expense for <?= date('M j', strtotime($date)) ?>
+                    using the form above.
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Recorded By</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <?php if (Auth::isOwner()): ?><th>Action</th><?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
                         <?php foreach ($expenses as $e): ?>
                             <?php $show_locked = $staff_locked || $e['Locked_status']; ?>
                             <tr>
@@ -137,6 +153,10 @@
                                 <?php if (Auth::isOwner()): ?>
                                 <td>
                                     <?php if (!$e['Locked_status']): ?>
+                                        <button type="button" class="btn btn-sm btn-outline"
+                                                onclick="toggleExpenseEdit(<?= $e['Expense_ID'] ?>)">
+                                            Edit
+                                        </button>
                                         <form method="POST" action="<?= BASE_URL ?>/expenses/delete" class="inline-form">
                                             <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                                             <input type="hidden" name="expense_id" value="<?= $e['Expense_ID'] ?>">
@@ -170,10 +190,49 @@
                                 </td>
                                 <?php endif; ?>
                             </tr>
+                            <?php if (Auth::isOwner() && !$e['Locked_status']): ?>
+                                <tr id="expense-edit-<?= $e['Expense_ID'] ?>" class="inline-edit-row" style="display:none;">
+                                    <td colspan="<?= Auth::isOwner() ? 6 : 5 ?>">
+                                        <form method="POST" action="<?= BASE_URL ?>/expenses/update" class="inline-edit-form">
+                                            <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                            <input type="hidden" name="expense_id" value="<?= $e['Expense_ID'] ?>">
+                                            <input type="hidden" name="date" value="<?= $date ?>">
+                                            <div class="inline-edit-fields">
+                                                <div class="form-group" style="flex:1;">
+                                                    <label>Description</label>
+                                                    <input type="text" name="description"
+                                                           class="form-input input-sm"
+                                                           value="<?= htmlspecialchars($e['Description']) ?>" required>
+                                                </div>
+                                                <div class="form-group" style="flex:0 0 140px;">
+                                                    <label>Amount (₱)</label>
+                                                    <input type="number" name="amount"
+                                                           class="form-input input-sm"
+                                                           value="<?= $e['Amount'] ?>"
+                                                           min="0.01" step="0.01" required>
+                                                </div>
+                                                <div class="inline-edit-actions">
+                                                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                                    <button type="button" class="btn btn-sm btn-outline"
+                                                            onclick="toggleExpenseEdit(<?= $e['Expense_ID'] ?>)">Cancel</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 </section>
+
+<script>
+function toggleExpenseEdit(id) {
+    const row = document.getElementById('expense-edit-' + id);
+    if (!row) return;
+    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>

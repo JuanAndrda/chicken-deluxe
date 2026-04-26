@@ -91,8 +91,14 @@ chicken-deluxe/
 │
 └── sql/
     ├── schema.sql                   ← Full DB creation script (run on Master)
-    └── triggers.sql                 ← All SQL triggers (run on Master)
+    ├── triggers.sql                 ← All SQL triggers (run on Master)
+    ├── demo_reset.sql               ← Wipe transactional tables + reset prices
+    ├── demo_seed.sql                ← Seed 5 staff users + yesterday/today demo data
+    ├── migrations/                  ← Dated change-scripts (e.g. outlet→kiosk rename)
+    └── backups/                     ← Pre-risky-operation snapshots
 ```
+
+**Note on the `views/admin/` folder:** also contains `edit-user.php` (added in the April 2026 UI/UX pass) and `audit-log.php` (filterable + paginated viewer with diff panels).
 
 ### Rules about structure
 - **Never dump files in the root** — every file has a folder it belongs to
@@ -183,11 +189,11 @@ These must be enforced at the DB/model level, not just the UI:
 - All triggers live in `sql/triggers.sql`
 - Before adding a new trigger, run `SHOW TRIGGERS FROM chicken_deluxe;` to avoid duplicates
 - Triggers are only created on the **Master** — they replicate automatically
-- Current planned triggers:
-  - `trg_auto_lock_inventory` — locks records when ending snapshot is inserted
-  - `trg_calc_line_total` — auto-calculates line total before Sales insert
-  - `trg_audit_inventory_update` — writes to Audit_Log after any Inventory_Snapshot update
-  - `trg_prevent_locked_sales_edit` — raises error if editing a locked Sales record
+- **28 triggers currently live** (see `DATABASE_FULL_DOCUMENTATION.md` Part 2 for the full list):
+  - **Business-rule (7):** `trg_calc_line_total_insert/update`, `trg_prevent_locked_sales/inventory/delivery/expense_edit`, `trg_audit_inventory_unlock`
+  - **Change-logging (21):** `trg_log_<table>_insert/update/delete` for Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk
+- ⚠️ **The change-logging triggers fire on every INSERT/UPDATE/DELETE** to those 7 tables and write a row to `Audit_Log`. Bulk seed/reset scripts should TRUNCATE Audit_Log at the end to avoid hundreds of trigger-noise rows — see `sql/demo_reset.sql` / `sql/demo_seed.sql` for the pattern.
+- TRUNCATE does **not** fire DML triggers in MySQL — useful for clean wipes.
 
 ---
 

@@ -93,6 +93,67 @@ class SalesController extends Controller
         $this->redirect("/sales?date={$date}&kiosk_id={$kiosk_id}&success=Sale+recorded");
     }
 
+    /** Handle batch sale submission from the POS cart */
+    public function storeBatch(): void
+    {
+        Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/sales?error=Invalid+request');
+            return;
+        }
+
+        $kiosk_id = $this->resolveKiosk();
+        $date     = $this->post('date', date('Y-m-d'));
+
+        // Items come as parallel arrays: product_ids[] + quantities[]
+        $product_ids = $this->post('product_ids', []);
+        $quantities  = $this->post('quantities', []);
+
+        if (!is_array($product_ids) || !is_array($quantities)
+            || empty($product_ids) || count($product_ids) !== count($quantities)) {
+            $this->redirect("/sales?date={$date}&error=No+items+in+order");
+            return;
+        }
+
+        // Build items — look up unit price from Product table; never trust the form
+        $items     = [];
+        $total_qty = 0;
+        foreach ($product_ids as $idx => $pid) {
+            $product_id = (int) $pid;
+            $qty        = max(1, (int) $quantities[$idx]);
+            $product    = $this->productModel->findById($product_id);
+
+            if (!$product || !$product['Active']) continue;
+
+            $items[] = [
+                'product_id'    => $product_id,
+                'quantity_sold' => $qty,
+                'unit_price'    => (float) $product['Price'],
+            ];
+            $total_qty += $qty;
+        }
+
+        if (empty($items)) {
+            $this->redirect("/sales?date={$date}&error=No+valid+products+in+order");
+            return;
+        }
+
+        try {
+            $count = $this->salesModel->createBatch($kiosk_id, Auth::userId(), $date, $items);
+
+            $this->auditLog->log(
+                Auth::userId(),
+                ACTION_CREATE,
+                "Batch sale: {$count} product(s), {$total_qty} total units for kiosk {$kiosk_id} on {$date}"
+            );
+
+            $this->redirect("/sales?date={$date}&kiosk_id={$kiosk_id}&success=Order+confirmed+({$count}+items+saved)");
+        } catch (\Exception $e) {
+            $this->redirect("/sales?date={$date}&error=Failed+to+save+order:+" . urlencode($e->getMessage()));
+        }
+    }
+
     /** Lock all sales for a date */
     public function lock(): void
     {
