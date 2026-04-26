@@ -69,6 +69,11 @@ class ExpenseController extends Controller
         $description = trim($this->post('description', ''));
         $date        = $this->post('date', date('Y-m-d'));
 
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/expenses?error=Cannot+record+expenses+for+future+dates');
+            return;
+        }
+
         if ($amount <= 0 || $description === '') {
             $this->redirect("/expenses?date={$date}&error=Amount+and+description+are+required");
             return;
@@ -154,6 +159,11 @@ class ExpenseController extends Controller
         $amount      = (float) $this->post('amount');
         $description = trim($this->post('description', ''));
         $date        = $this->post('date', date('Y-m-d'));
+
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/expenses?error=Cannot+edit+expenses+for+future+dates');
+            return;
+        }
 
         if ($amount <= 0 || $description === '') {
             $this->redirect("/expenses?date={$date}&error=Amount+and+description+are+required");

@@ -72,6 +72,11 @@ class DeliveryController extends Controller
         $quantity   = (int) $this->post('quantity');
         $date       = $this->post('date', date('Y-m-d'));
 
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/delivery?error=Cannot+record+deliveries+for+future+dates');
+            return;
+        }
+
         if ($product_id <= 0 || $quantity <= 0) {
             $this->redirect("/delivery?date={$date}&error=Product+and+quantity+are+required");
             return;
@@ -156,6 +161,11 @@ class DeliveryController extends Controller
         $delivery_id = (int) $this->post('delivery_id');
         $quantity    = (int) $this->post('quantity');
         $date        = $this->post('date', date('Y-m-d'));
+
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/delivery?error=Cannot+edit+deliveries+for+future+dates');
+            return;
+        }
 
         if ($quantity <= 0) {
             $this->redirect("/delivery?date={$date}&error=Quantity+must+be+greater+than+zero");

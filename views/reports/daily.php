@@ -41,7 +41,9 @@
             <div class="form-group">
                 <label for="date">Date</label>
                 <input type="date" id="date" name="date" class="form-input"
-                       value="<?= htmlspecialchars($date) ?>" onchange="this.form.submit()">
+                       value="<?= htmlspecialchars($date) ?>"
+                       max="<?= date('Y-m-d') ?>"
+                       onchange="this.form.submit()">
             </div>
         </form>
     </div>

@@ -85,6 +85,11 @@ class InventoryController extends Controller
         $type      = $this->post('snapshot_type');
         $date      = $this->post('date', date('Y-m-d'));
 
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/inventory?error=Cannot+record+inventory+for+future+dates');
+            return;
+        }
+
         if (!in_array($type, ['beginning', 'ending'], true)) {
             $this->redirect('/inventory?error=Invalid+snapshot+type');
             return;
@@ -145,6 +150,11 @@ class InventoryController extends Controller
 
         $kiosk_id = $this->resolveKiosk();
         $date     = $this->post('date', date('Y-m-d'));
+
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/inventory?error=Cannot+record+inventory+for+future+dates');
+            return;
+        }
 
         // Block if a beginning already exists for that day
         if ($this->inventoryModel->hasBeginningToday($kiosk_id) && $date === date('Y-m-d')) {

@@ -90,12 +90,14 @@ $end   = min($current_page * $per_page, $total_rows);
             <div class="form-group">
                 <label for="from_date">From</label>
                 <input type="date" id="from_date" name="from_date" class="form-input"
-                       value="<?= htmlspecialchars($from_date ?? '') ?>">
+                       value="<?= htmlspecialchars($from_date ?? '') ?>"
+                       max="<?= date('Y-m-d') ?>">
             </div>
             <div class="form-group">
                 <label for="to_date">To</label>
                 <input type="date" id="to_date" name="to_date" class="form-input"
-                       value="<?= htmlspecialchars($to_date ?? '') ?>">
+                       value="<?= htmlspecialchars($to_date ?? '') ?>"
+                       max="<?= date('Y-m-d') ?>">
             </div>
             <div class="form-group">
                 <label for="action">Action</label>

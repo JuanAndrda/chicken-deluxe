@@ -74,6 +74,11 @@ class SalesController extends Controller
         $qty_sold   = (int) $this->post('quantity_sold');
         $date       = $this->post('date', date('Y-m-d'));
 
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/sales?error=Cannot+record+sales+for+future+dates');
+            return;
+        }
+
         if ($product_id <= 0 || $qty_sold <= 0) {
             $this->redirect("/sales?date={$date}&error=Product+and+quantity+are+required");
             return;
@@ -105,6 +110,11 @@ class SalesController extends Controller
 
         $kiosk_id = $this->resolveKiosk();
         $date     = $this->post('date', date('Y-m-d'));
+
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/sales?error=Cannot+record+sales+for+future+dates');
+            return;
+        }
 
         // Items come as parallel arrays: product_ids[] + quantities[]
         $product_ids = $this->post('product_ids', []);

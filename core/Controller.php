@@ -82,4 +82,14 @@ class Controller
         }
         return true;
     }
+
+    /**
+     * Returns true if the given date string is a future date (later than today).
+     * Used to guard write actions across all operational modules — we never let
+     * staff or owner record/edit data for days that haven't happened yet.
+     */
+    protected function isFutureDate(string $date): bool
+    {
+        return $date > date('Y-m-d');
+    }
 }

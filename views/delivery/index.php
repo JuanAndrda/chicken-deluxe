@@ -17,6 +17,12 @@
         <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
+    <?php if ($date > date('Y-m-d')): ?>
+        <div class="alert alert-warning">
+            ⏳ <strong><?= date('M j, Y', strtotime($date)) ?></strong> hasn't happened yet — you can't record deliveries for future dates. Pick today or an earlier day.
+        </div>
+    <?php endif; ?>
+
     <!-- Filters -->
     <div class="card form-card">
         <form method="GET" action="<?= BASE_URL ?>/delivery" class="form-inline-row">
@@ -35,7 +41,9 @@
             <div class="form-group">
                 <label for="date">Date</label>
                 <input type="date" id="date" name="date" class="form-input"
-                       value="<?= htmlspecialchars($date) ?>" onchange="this.form.submit()">
+                       value="<?= htmlspecialchars($date) ?>"
+                       max="<?= date('Y-m-d') ?>"
+                       onchange="this.form.submit()">
             </div>
         </form>
     </div>
