@@ -1,4 +1,34 @@
-<?php $staff_locked = Auth::isStaff(); ?>
+<?php
+    $staff_locked = Auth::isStaff();
+
+    /* ============================================================
+       Step-tab layout: visibility + auto-focus
+       ============================================================ */
+    // Running widget renders only when these conditions hold (preserved
+    // from the original inline gate). The Running tab button is hidden
+    // when this is false.
+    $has_running = $has_beginning && !$has_ending && !empty($running_inventory ?? []);
+
+    // Pick which tab to open on page load
+    if ($has_ending) {
+        $active_step = 'ending';        // Day complete — review mode
+    } elseif ($has_beginning) {
+        $active_step = $has_running ? 'running' : 'ending';
+    } else {
+        $active_step = 'beginning';     // Day starts here
+    }
+
+    // Counts for the mini status strip (running widget only)
+    $running_warn_count = 0;
+    $running_total_units = 0;
+    if ($has_running) {
+        foreach ($running_inventory as $r) {
+            $q = (int) $r['Running_Qty'];
+            $running_total_units += max(0, $q);
+            if ($q <= 5) $running_warn_count++;
+        }
+    }
+?>
 <section class="inventory">
     <div class="section-header">
         <h2>Inventory — <?= htmlspecialchars($kiosk['Name'] ?? 'Unknown') ?></h2>
@@ -43,7 +73,6 @@
             <div class="history-links">
                 <?php foreach (array_slice($history, 0, 7) as $record): ?>
                     <?php
-                        // Carry-forward indicator: ✓ fully locked (ended), → in-progress (beginning only), ⚠ stale/open
                         $is_locked   = (int) $record['is_locked'] === 1;
                         $cf_icon     = $is_locked ? '&#x2713;' : '&rarr;';
                         $cf_class    = $is_locked ? 'cf-locked' : 'cf-open';
@@ -60,9 +89,98 @@
         </div>
     <?php endif; ?>
 
-    <!-- Beginning Stock -->
-    <div class="card">
-        <h3>Beginning Stock</h3>
+    <!-- ============================================================
+         STEP-TAB WRAPPER — Beginning / Running / Ending
+         Same tab pattern used on Sales and Delivery pages.
+         ============================================================ -->
+    <div class="card inventory-step-wrapper">
+
+        <!-- Tab nav -->
+        <div class="inventory-step-nav" role="tablist">
+            <button type="button"
+                    class="inventory-step-btn <?= $active_step === 'beginning' ? 'active' : '' ?>"
+                    data-step="beginning" role="tab">
+                <span class="inventory-step-num">1</span>
+                <span class="inventory-step-label">Beginning Stock</span>
+                <?php if ($has_beginning): ?>
+                    <span class="inventory-step-badge step-badge-done">&#x2713;</span>
+                <?php elseif ($is_today): ?>
+                    <span class="inventory-step-badge step-badge-pending">to do</span>
+                <?php else: ?>
+                    <span class="inventory-step-badge step-badge-empty">&mdash;</span>
+                <?php endif; ?>
+            </button>
+
+            <?php if ($has_running): ?>
+                <button type="button"
+                        class="inventory-step-btn <?= $active_step === 'running' ? 'active' : '' ?>"
+                        data-step="running" role="tab">
+                    <span class="inventory-step-num">2</span>
+                    <span class="inventory-step-label">Running Inventory <span class="text-light">(live)</span></span>
+                    <?php if ($running_warn_count > 0): ?>
+                        <span class="inventory-step-badge step-badge-warn">&#9888; <?= $running_warn_count ?></span>
+                    <?php endif; ?>
+                </button>
+            <?php endif; ?>
+
+            <button type="button"
+                    class="inventory-step-btn <?= $active_step === 'ending' ? 'active' : '' ?>"
+                    data-step="ending" role="tab">
+                <span class="inventory-step-num"><?= $has_running ? 3 : 2 ?></span>
+                <span class="inventory-step-label">Ending Stock</span>
+                <?php if ($has_ending): ?>
+                    <span class="inventory-step-badge step-badge-done">&#x2713;</span>
+                <?php elseif ($is_today && $has_beginning): ?>
+                    <span class="inventory-step-badge step-badge-pending">to do</span>
+                <?php else: ?>
+                    <span class="inventory-step-badge step-badge-empty">&mdash;</span>
+                <?php endif; ?>
+            </button>
+        </div>
+
+        <!-- Mini status strip — at-a-glance state of all 3 steps -->
+        <div class="inventory-step-status">
+            <span class="step-status-item">
+                <strong>Beginning:</strong>
+                <?php if ($has_beginning): ?>
+                    <span class="text-success">&#x2713; done</span>
+                <?php elseif ($is_today): ?>
+                    <span class="text-warning">not yet</span>
+                <?php else: ?>
+                    <span class="text-light">&mdash;</span>
+                <?php endif; ?>
+            </span>
+            <span class="step-status-divider">&middot;</span>
+            <span class="step-status-item">
+                <strong>Running:</strong>
+                <?php if ($has_running): ?>
+                    <?= $running_total_units ?> units left
+                    <?php if ($running_warn_count > 0): ?>
+                        (<?= $running_warn_count ?> low)
+                    <?php endif; ?>
+                <?php elseif ($has_ending): ?>
+                    <span class="text-light">day closed</span>
+                <?php else: ?>
+                    <span class="text-light">&mdash;</span>
+                <?php endif; ?>
+            </span>
+            <span class="step-status-divider">&middot;</span>
+            <span class="step-status-item">
+                <strong>Ending:</strong>
+                <?php if ($has_ending): ?>
+                    <span class="text-success">&#x2713; locked</span>
+                <?php elseif ($is_today && $has_beginning): ?>
+                    <span class="text-warning">not yet</span>
+                <?php else: ?>
+                    <span class="text-light">&mdash;</span>
+                <?php endif; ?>
+            </span>
+        </div>
+
+        <!-- ====================== STEP 1: BEGINNING ====================== -->
+        <div class="inventory-step-panel <?= $active_step === 'beginning' ? 'active' : '' ?>"
+             id="step-beginning" role="tabpanel">
+
         <?php if ($has_beginning): ?>
             <?php
                 // Group saved rows by category to mirror the entry-form tab layout
@@ -248,90 +366,96 @@
         <?php else: ?>
             <p class="text-light">No beginning stock recorded for this date.</p>
         <?php endif; ?>
-    </div>
 
-    <!-- ============================================================
-         Running Inventory Widget — live stock = beginning + delivered - sold
-         Only shown when beginning is recorded but ending is not yet locked.
-         ============================================================ -->
-    <?php if ($has_beginning && !$has_ending && !empty($running_inventory)): ?>
-        <?php
-            // Group for the same tab pattern as other inventory cards
-            $running_grouped = [];
-            foreach ($running_inventory as $r) {
-                $running_grouped[$r['Category_Name']][] = $r;
-            }
-            $low_count = 0; $zero_count = 0; $neg_count = 0;
-            foreach ($running_inventory as $r) {
-                $q = (int) $r['Running_Qty'];
-                if ($q < 0)      $neg_count++;
-                elseif ($q === 0) $zero_count++;
-                elseif ($q <= 5)  $low_count++;
-            }
-        ?>
-        <div class="card running-inventory-card">
-            <div class="running-inventory-header">
-                <h3>Running Inventory <span class="text-light">(live)</span></h3>
-                <div class="running-inventory-stats">
-                    <span class="running-stat running-stat-neg" title="Negative — sold more than available">&#9888; <?= $neg_count ?></span>
-                    <span class="running-stat running-stat-zero" title="Out of stock">&#8709; <?= $zero_count ?></span>
-                    <span class="running-stat running-stat-low" title="Low stock (1-5)">&#9888; <?= $low_count ?></span>
+        </div><!-- /#step-beginning -->
+
+        <!-- ====================== STEP 2: RUNNING ====================== -->
+        <?php if ($has_running): ?>
+            <?php
+                $running_grouped = [];
+                foreach ($running_inventory as $r) {
+                    $running_grouped[$r['Category_Name']][] = $r;
+                }
+                $low_count = 0; $zero_count = 0; $neg_count = 0;
+                foreach ($running_inventory as $r) {
+                    $q = (int) $r['Running_Qty'];
+                    if ($q < 0)      $neg_count++;
+                    elseif ($q === 0) $zero_count++;
+                    elseif ($q <= 5)  $low_count++;
+                }
+            ?>
+            <div class="inventory-step-panel <?= $active_step === 'running' ? 'active' : '' ?>"
+                 id="step-running" role="tabpanel">
+
+                <div class="running-inventory-header">
+                    <p class="text-light running-inventory-formula" style="margin:0;">
+                        Beginning + Delivered &minus; Sold = Running stock
+                    </p>
+                    <div class="running-inventory-stats">
+                        <span class="running-stat running-stat-neg" title="Negative — sold more than available">&#9888; <?= $neg_count ?></span>
+                        <span class="running-stat running-stat-zero" title="Out of stock">&#8709; <?= $zero_count ?></span>
+                        <span class="running-stat running-stat-low" title="Low stock (1-5)">&#9888; <?= $low_count ?></span>
+                    </div>
                 </div>
-            </div>
-            <p class="text-light running-inventory-formula">
-                Beginning + Delivered &minus; Sold = Running stock
-            </p>
 
-            <div class="inventory-saved-view">
-                <div class="inventory-tabs" role="tablist">
+                <div class="inventory-saved-view">
+                    <div class="inventory-tabs" role="tablist">
+                        <?php $first = true; foreach ($running_grouped as $category => $items): ?>
+                            <button type="button"
+                                    class="inventory-tab<?= $first ? ' active' : '' ?>"
+                                    data-category="<?= htmlspecialchars($category) ?>"
+                                    role="tab">
+                                <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
+                                <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
+                            </button>
+                        <?php $first = false; endforeach; ?>
+                    </div>
+
                     <?php $first = true; foreach ($running_grouped as $category => $items): ?>
-                        <button type="button"
-                                class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                data-category="<?= htmlspecialchars($category) ?>"
-                                role="tab">
-                            <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                            <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                        </button>
+                        <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
+                             data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
+                            <?php foreach ($items as $r): ?>
+                                <?php
+                                    $q = (int) $r['Running_Qty'];
+                                    $row_class = '';
+                                    if ($q < 0)       $row_class = 'running-row-negative';
+                                    elseif ($q === 0) $row_class = 'running-row-zero';
+                                    elseif ($q <= 5)  $row_class = 'running-row-low';
+                                ?>
+                                <div class="inventory-product-row running-product-row <?= $row_class ?>">
+                                    <div class="inventory-product-name"><?= htmlspecialchars($r['Product_Name']) ?></div>
+                                    <div class="inventory-product-unit"><?= htmlspecialchars($r['Unit']) ?></div>
+                                    <div class="running-breakdown">
+                                        <span title="Beginning"><?= (int) $r['Beginning_Qty'] ?></span>
+                                        <span class="running-op">+</span>
+                                        <span title="Delivered today" class="running-delivered"><?= (int) $r['Delivered_Qty'] ?></span>
+                                        <span class="running-op">&minus;</span>
+                                        <span title="Sold today" class="running-sold"><?= (int) $r['Sold_Qty'] ?></span>
+                                        <span class="running-op">=</span>
+                                    </div>
+                                    <div class="running-qty-final"><?= $q ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     <?php $first = false; endforeach; ?>
                 </div>
 
-                <?php $first = true; foreach ($running_grouped as $category => $items): ?>
-                    <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                         data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                        <?php foreach ($items as $r): ?>
-                            <?php
-                                $q = (int) $r['Running_Qty'];
-                                $row_class = '';
-                                if ($q < 0)       $row_class = 'running-row-negative';
-                                elseif ($q === 0) $row_class = 'running-row-zero';
-                                elseif ($q <= 5)  $row_class = 'running-row-low';
-                            ?>
-                            <div class="inventory-product-row running-product-row <?= $row_class ?>">
-                                <div class="inventory-product-name"><?= htmlspecialchars($r['Product_Name']) ?></div>
-                                <div class="inventory-product-unit"><?= htmlspecialchars($r['Unit']) ?></div>
-                                <div class="running-breakdown">
-                                    <span title="Beginning"><?= (int) $r['Beginning_Qty'] ?></span>
-                                    <span class="running-op">+</span>
-                                    <span title="Delivered today" class="running-delivered"><?= (int) $r['Delivered_Qty'] ?></span>
-                                    <span class="running-op">&minus;</span>
-                                    <span title="Sold today" class="running-sold"><?= (int) $r['Sold_Qty'] ?></span>
-                                    <span class="running-op">=</span>
-                                </div>
-                                <div class="running-qty-final"><?= $q ?></div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php $first = false; endforeach; ?>
-            </div>
-        </div>
-    <?php endif; ?>
+                <!-- Quick action: jump to ending tab to close the day -->
+                <div class="inventory-step-jump">
+                    <button type="button" class="btn btn-outline btn-sm"
+                            data-jump-step="ending">
+                        Ready to close the day &rarr; Ending Stock
+                    </button>
+                </div>
+            </div><!-- /#step-running -->
+        <?php endif; ?>
 
-    <!-- Ending Stock -->
-    <div class="card">
-        <h3>Ending Stock</h3>
+        <!-- ====================== STEP 3: ENDING ====================== -->
+        <div class="inventory-step-panel <?= $active_step === 'ending' ? 'active' : '' ?>"
+             id="step-ending" role="tabpanel">
+
         <?php if ($has_ending): ?>
             <?php
-                // Group + map beginning quantities so we can show "Beginning: X" alongside ending
                 $ending_grouped = [];
                 foreach ($ending as $row) {
                     $ending_grouped[$row['Category_Name']][] = $row;
@@ -404,8 +528,6 @@
         <?php elseif ($is_today && $has_beginning): ?>
             <!-- Ending Stock Form (tab layout) — pre-filled with running inventory -->
             <?php
-                // Map Product_ID => running quantity (beginning + delivered - sold)
-                // The form pre-fills with this value; user can override for physical recount.
                 $running_qty_map  = [];
                 $beginning_qty_map = [];
                 foreach ($running_inventory as $r) {
@@ -455,7 +577,6 @@
                                 $pid          = (int) $product['Product_ID'];
                                 $beg_qty      = $beginning_qty_map[$pid] ?? 0;
                                 $expected_qty = $running_qty_map[$pid] ?? $beg_qty;
-                                // Negative running stock → seed at 0 instead of a negative pre-fill
                                 $prefill = max(0, $expected_qty);
                             ?>
                             <div class="inventory-product-row" data-beginning="<?= $beg_qty ?>" data-expected="<?= $expected_qty ?>">
@@ -496,5 +617,35 @@
         <?php else: ?>
             <p class="text-light">No ending stock recorded for this date.</p>
         <?php endif; ?>
-    </div>
+
+        </div><!-- /#step-ending -->
+
+    </div><!-- /.inventory-step-wrapper -->
 </section>
+
+<script>
+/* Inventory step-tab switching — local to this page so it doesn't
+   collide with the category sub-tab JS in app.js. */
+(function () {
+    const navBtns = document.querySelectorAll('.inventory-step-btn');
+    const panels  = document.querySelectorAll('.inventory-step-panel');
+    if (!navBtns.length || !panels.length) return;
+
+    function activate(step) {
+        navBtns.forEach(b => b.classList.toggle('active', b.dataset.step === step));
+        panels.forEach(p => p.classList.toggle('active', p.id === 'step-' + step));
+        // Scroll the wrapper into view so a long form doesn't strand the tab nav off-screen
+        const wrapper = document.querySelector('.inventory-step-wrapper');
+        if (wrapper) wrapper.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => activate(btn.dataset.step));
+    });
+
+    // Quick-jump buttons inside any panel (e.g. the Running tab's "go to Ending")
+    document.querySelectorAll('[data-jump-step]').forEach(btn => {
+        btn.addEventListener('click', () => activate(btn.dataset.jumpStep));
+    });
+})();
+</script>

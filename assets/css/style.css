@@ -2525,3 +2525,142 @@ tr:hover {
     }
     .sales-cart-body { max-height: 220px; }
 }
+
+/* ================================
+   INVENTORY STEP-TAB LAYOUT (v2)
+   Beginning / Running / Ending workflow tabs.
+   Distinct class names from the in-form category .inventory-tabs
+   so the existing app.js bindings keep working.
+   ================================ */
+.inventory-step-wrapper {
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+/* ----- Tab nav ----- */
+.inventory-step-nav {
+    display: flex;
+    border-bottom: 2px solid #f0f0f0;
+    background: #FAFAFA;
+    padding: 0 8px;
+    flex-wrap: wrap;
+}
+.inventory-step-btn {
+    padding: 14px 22px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.inventory-step-btn:hover  { color: #333; }
+.inventory-step-btn.active {
+    color: #C62828;
+    border-bottom-color: #C62828;
+}
+.inventory-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #ddd;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.inventory-step-btn.active .inventory-step-num {
+    background: #C62828;
+}
+.inventory-step-label {
+    white-space: nowrap;
+}
+
+/* ----- Step badges (✓ / to do / ⚠) ----- */
+.inventory-step-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 2px;
+}
+.step-badge-done {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+.step-badge-pending {
+    background: #FFF3E0;
+    color: #E65100;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.step-badge-warn {
+    background: #FFEBEE;
+    color: #C62828;
+}
+.step-badge-empty {
+    background: #f0f0f0;
+    color: #aaa;
+}
+
+/* ----- Mini status strip ----- */
+.inventory-step-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: #FCFCFC;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+    color: #555;
+}
+.step-status-item   { white-space: nowrap; }
+.step-status-item strong { color: #212121; margin-right: 4px; }
+.step-status-divider {
+    color: #ccc;
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* ----- Step panels ----- */
+.inventory-step-panel {
+    display: none;
+    padding: 24px;
+}
+.inventory-step-panel.active { display: block; }
+
+/* Quick-jump button (e.g. on Running tab) */
+.inventory-step-jump {
+    margin-top: 20px;
+    text-align: right;
+    border-top: 1px dashed #e0e0e0;
+    padding-top: 16px;
+}
+
+/* Tighten the running header inside the new panel (no double-card padding) */
+.inventory-step-panel .running-inventory-header {
+    margin-bottom: 16px;
+}
+
+/* Mobile: stack tab buttons */
+@media (max-width: 700px) {
+    .inventory-step-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding: 12px 10px;
+        font-size: 13px;
+    }
+    .inventory-step-num { width: 18px; height: 18px; font-size: 11px; }
+    .inventory-step-status { font-size: 12px; padding: 10px 16px; }
+    .inventory-step-panel { padding: 16px; }
+}
