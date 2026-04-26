@@ -8,7 +8,10 @@
     foreach (($sales_by_kiosk ?? []) as $s)    { $max_kiosk_sales    = max($max_kiosk_sales, (float) $s['Total_Sales']); }
     $max_kiosk_expenses = 0;
     foreach (($expense_by_kiosk ?? []) as $e)  { $max_kiosk_expenses = max($max_kiosk_expenses, (float) $e['Total_Expenses']); }
-    $has_anomalies = !empty($anomalies);
+    // Anomalies tab appears if EITHER missing-snapshot rows exist OR any kiosk
+    // hasn't recorded an ending for the report's `to_date`.
+    $has_anomalies     = !empty($anomalies) || !empty($kiosks_no_ending ?? []);
+    $has_top_products  = !empty($top_products ?? []);
 ?>
 <section class="reports">
     <div class="section-header">
@@ -72,6 +75,9 @@
         <button type="button" class="report-inner-tab"        data-tab="daily-sales" role="tab">Daily Sales</button>
         <button type="button" class="report-inner-tab"        data-tab="daily-exp"   role="tab">Daily Expenses</button>
         <button type="button" class="report-inner-tab"        data-tab="deliveries"  role="tab">Deliveries</button>
+        <?php if ($has_top_products): ?>
+            <button type="button" class="report-inner-tab" data-tab="top-products" role="tab">⭐ Top Performers</button>
+        <?php endif; ?>
         <?php if ($has_anomalies): ?>
             <button type="button" class="report-inner-tab has-anomaly" data-tab="anomalies" role="tab">Anomalies</button>
         <?php endif; ?>
@@ -261,37 +267,120 @@
         <?php endif; ?>
     </div>
 
-    <!-- ======================= TAB 6: Anomalies (only if non-empty) ========= -->
-    <?php if ($has_anomalies): ?>
-        <div class="card report-inner-panel" data-tab="anomalies">
-            <h3>Missing Inventory Snapshots</h3>
+    <!-- ======================= TAB 6: Top Performers (subquery: HAVING avg) ===== -->
+    <?php if ($has_top_products): ?>
+        <div class="card report-inner-panel" data-tab="top-products">
+            <h3>⭐ Top-Performing Products</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px;">
+                Products whose total quantity sold in
+                <?= date('M j', strtotime($from_date)) ?>&ndash;<?= date('M j, Y', strtotime($to_date)) ?>
+                is <strong>above the per-product average</strong> for the same period.
+                Useful for spotting which menu items are driving revenue.
+            </p>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Kiosk</th>
-                            <th>Missing</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Units Sold</th>
+                            <th>Revenue</th>
+                            <th>Vs. Average</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($anomalies as $a): ?>
-                            <tr class="row-warning">
-                                <td><?= date('M j, Y', strtotime($a['Snapshot_date'])) ?></td>
-                                <td><?= htmlspecialchars($a['Kiosk_Name']) ?></td>
-                                <td>
-                                    <?php
-                                        $missing = [];
-                                        if ($a['has_beginning'] == 0) $missing[] = 'Beginning';
-                                        if ($a['has_ending'] == 0)    $missing[] = 'Ending';
-                                        echo implode(' &amp; ', $missing);
-                                    ?>
-                                </td>
+                        <?php
+                            // Compute the average from the result set so we can
+                            // show "+N units above average" per row.
+                            $period_avg = 0;
+                            if (!empty($top_products)) {
+                                $sum = 0;
+                                foreach ($top_products as $tp) { $sum += (int) $tp['Total_Sold']; }
+                                $period_avg = $sum / count($top_products);
+                            }
+                        ?>
+                        <?php foreach ($top_products as $tp): ?>
+                            <?php $delta = (int) $tp['Total_Sold'] - $period_avg; ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($tp['Product_Name']) ?></strong></td>
+                                <td><span class="badge badge-category"><?= htmlspecialchars($tp['Category_Name']) ?></span></td>
+                                <td><?= (int) $tp['Total_Sold'] ?></td>
+                                <td><strong>P<?= number_format((float) $tp['Total_Revenue'], 2) ?></strong></td>
+                                <td class="text-success">+<?= number_format($delta, 1) ?> units</td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- ======================= TAB 7: Anomalies (only if non-empty) ========= -->
+    <?php if ($has_anomalies): ?>
+        <div class="card report-inner-panel" data-tab="anomalies">
+
+            <!-- 7a: Missing snapshots over the date range -->
+            <?php if (!empty($anomalies)): ?>
+                <h3>Missing Inventory Snapshots</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Kiosk</th>
+                                <th>Missing</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($anomalies as $a): ?>
+                                <tr class="row-warning">
+                                    <td><?= date('M j, Y', strtotime($a['Snapshot_date'])) ?></td>
+                                    <td><?= htmlspecialchars($a['Kiosk_Name']) ?></td>
+                                    <td>
+                                        <?php
+                                            $missing = [];
+                                            if ($a['has_beginning'] == 0) $missing[] = 'Beginning';
+                                            if ($a['has_ending'] == 0)    $missing[] = 'Ending';
+                                            echo implode(' &amp; ', $missing);
+                                        ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <!-- 7b: Kiosks that haven't yet recorded an ending for the report's end date
+                       (subquery: NOT IN against today's recorded endings) -->
+            <?php if (!empty($kiosks_no_ending)): ?>
+                <h3 style="margin-top:24px;">
+                    Kiosks Missing Ending Snapshot for <?= date('M j, Y', strtotime($to_date)) ?>
+                </h3>
+                <p class="text-muted" style="font-size:13px;margin-bottom:12px;">
+                    These active kiosks have no <code>ending</code> snapshot yet for the report's end date.
+                    Owner should follow up before locking the day.
+                </p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kiosk</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($kiosks_no_ending as $k): ?>
+                                <tr class="row-warning">
+                                    <td><strong><?= htmlspecialchars($k['Name']) ?></strong></td>
+                                    <td><?= htmlspecialchars($k['Location']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
         </div>
     <?php endif; ?>
 </section>

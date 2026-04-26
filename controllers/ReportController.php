@@ -86,6 +86,12 @@ class ReportController extends Controller
         $deliveries       = $this->reportModel->getDeliverySummary($from_date, $to_date, $kiosk_id);
         $anomalies        = $this->reportModel->getMissingSnapshots($from_date, $to_date);
 
+        // Subquery-driven analytics:
+        //   getProductsAboveAverageSales — derived-table HAVING subquery
+        //   getKiosksWithoutEndingSnapshot — NOT IN subquery (for the report's end date)
+        $top_products     = $this->reportModel->getProductsAboveAverageSales($from_date, $to_date);
+        $kiosks_no_ending = $this->reportModel->getKiosksWithoutEndingSnapshot($to_date);
+
         // Grand totals
         $grand_sales = 0;
         $grand_expenses = 0;
@@ -93,21 +99,23 @@ class ReportController extends Controller
         foreach ($expense_by_kiosk as $e) { $grand_expenses += $e['Total_Expenses']; }
 
         $data = [
-            'page_title'      => 'Consolidated Report',
-            'active_tab'      => 'consolidated',
-            'kiosks'          => $kiosks,
-            'kiosk_id'       => $kiosk_id,
-            'from_date'       => $from_date,
-            'to_date'         => $to_date,
-            'sales_by_kiosk'  => $sales_by_kiosk,
-            'expense_by_kiosk'=> $expense_by_kiosk,
-            'daily_sales'     => $daily_sales,
-            'daily_expenses'  => $daily_expenses,
-            'deliveries'      => $deliveries,
-            'anomalies'       => $anomalies,
-            'grand_sales'     => $grand_sales,
-            'grand_expenses'  => $grand_expenses,
-            'net_income'      => $grand_sales - $grand_expenses,
+            'page_title'       => 'Consolidated Report',
+            'active_tab'       => 'consolidated',
+            'kiosks'           => $kiosks,
+            'kiosk_id'         => $kiosk_id,
+            'from_date'        => $from_date,
+            'to_date'          => $to_date,
+            'sales_by_kiosk'   => $sales_by_kiosk,
+            'expense_by_kiosk' => $expense_by_kiosk,
+            'daily_sales'      => $daily_sales,
+            'daily_expenses'   => $daily_expenses,
+            'deliveries'       => $deliveries,
+            'anomalies'        => $anomalies,
+            'top_products'     => $top_products,
+            'kiosks_no_ending' => $kiosks_no_ending,
+            'grand_sales'      => $grand_sales,
+            'grand_expenses'   => $grand_expenses,
+            'net_income'       => $grand_sales - $grand_expenses,
         ];
 
         $this->render('reports/consolidated', $data);

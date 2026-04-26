@@ -157,6 +157,12 @@ Expanded `Audit_Log` with `Operation`, `Table_name`, `Old_values`, `New_values` 
 
 **✅ RESOLVED (2026-04-20):** Two subqueries added to `ReportModel.php` — one uses correlated-free derived tables in a HAVING clause ("products whose total quantity sold > average per-product total in the date range"), the other uses a `NOT IN` subquery ("active kiosks that have not yet recorded an ending snapshot for the given date"). Both tested live against the slave.
 
+**✅ WIRED INTO UI (this iteration):** Both subqueries now power user-facing panels on `views/reports/consolidated.php`:
+- ⭐ **Top Performers tab** — surfaces `getProductsAboveAverageSales()` results with a "+N units above average" delta per row.
+- **Anomalies tab — Kiosks Missing Ending** subsection — surfaces `getKiosksWithoutEndingSnapshot()` for the report's `to_date` so the Owner can chase down branches that haven't closed their day. The subquery also drives the Anomalies tab's visibility (tab appears if EITHER missing-snapshots OR missing-endings exist).
+
+These are no longer "model-only" methods — they show up on the screen.
+
 ---
 
 ## SECTION 2 — DATABASE DESIGN & ARCHITECTURE (35%)

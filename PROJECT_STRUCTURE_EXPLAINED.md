@@ -164,6 +164,7 @@ A **controller** is the middleman between what the user wants and what the syste
   - **`main.php`** — The HTML wrapper (the `<head>`, `<body>`, footer). Every other view is "wrapped" by this file.
   - **`navbar.php`** — The top bar with the logo and the user's full name (now uses `Auth::fullName()` instead of just the username).
   - **`sidebar.php`** — The left-side menu that changes depending on the user's role (Owner sees more options, Staff sees less). Staff users now see a 📍 **kiosk badge** at the bottom showing which branch they're assigned to (uses `$_SESSION['kiosk_name']` cached at login).
+  - **`modal.php`** — A single hidden confirm-dialog overlay that gets included once by `main.php` and is then driven by the `showConfirmModal()` helper in `assets/js/app.js`. Every Lock / Unlock / Delete / Save button across the app calls into it instead of using the browser's native `confirm()` — keeps the styling consistent and lets the modal show colour-coded confirm buttons (red for delete, blue for unlock, green for lock).
 
 - **`auth/`** — Login screen.
   - **`login.php`** — The username/password form. The only page accessible without being logged in.
