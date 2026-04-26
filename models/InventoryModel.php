@@ -188,18 +188,8 @@ class InventoryModel extends Model
      */
     public function autoGenerateBeginning(int $kiosk_id, int $user_id, string $date): int
     {
-        // Don't overwrite an existing beginning for that date
-        $exists = $this->db->readOne(
-            "SELECT COUNT(*) AS cnt FROM Inventory_Snapshot
-             WHERE Kiosk_ID = ? AND Snapshot_date = ? AND Snapshot_type = 'beginning'",
-            [$kiosk_id, $date]
-        );
-        if (($exists['cnt'] ?? 0) > 0) {
-            return 0;
-        }
-
         // Build quantities map from previous locked ending
-        $previous = $this->getPreviousDayEnding($kiosk_id, $date);
+        $previous   = $this->getPreviousDayEnding($kiosk_id, $date);
         $quantities = [];
 
         if (!empty($previous)) {
@@ -220,7 +210,29 @@ class InventoryModel extends Model
             return 0;
         }
 
-        return $this->createBatchSnapshots($kiosk_id, $user_id, 'beginning', $quantities, $date);
+        // Use INSERT IGNORE so any product that already has a beginning row
+        // for this kiosk+date is silently skipped instead of raising a
+        // duplicate-key error. This makes the operation idempotent and safe
+        // against stale-slave reads or repeated clicks.
+        $inserted = 0;
+        $this->db->beginTransaction();
+        try {
+            foreach ($quantities as $product_id => $qty) {
+                $rows = $this->db->write(
+                    "INSERT IGNORE INTO Inventory_Snapshot
+                        (Kiosk_ID, Product_ID, User_ID, Snapshot_type, Quantity, Snapshot_date)
+                     VALUES (?, ?, ?, 'beginning', ?, ?)",
+                    [$kiosk_id, (int) $product_id, $user_id, (int) $qty, $date]
+                );
+                $inserted += $rows;
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+
+        return $inserted;
     }
 
     /**

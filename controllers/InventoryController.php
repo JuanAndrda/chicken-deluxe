@@ -162,7 +162,10 @@ class InventoryController extends Controller
             );
 
             if ($count === 0) {
-                $this->redirect("/inventory?date={$date}&error=Auto-generate+failed:+nothing+to+create");
+                // Either no products to fill, or every target row already
+                // existed (INSERT IGNORE silently skipped them). Either way,
+                // there's nothing to do — show a calm informational message.
+                $this->redirect("/inventory?date={$date}&success=Beginning+stock+is+already+complete+for+today");
                 return;
             }
 
