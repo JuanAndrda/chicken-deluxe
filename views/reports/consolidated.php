@@ -272,10 +272,8 @@
         <div class="card report-inner-panel" data-tab="top-products">
             <h3>⭐ Top-Performing Products</h3>
             <p class="text-muted" style="font-size:13px;margin-bottom:12px;">
-                Products whose total quantity sold in
-                <?= date('M j', strtotime($from_date)) ?>&ndash;<?= date('M j, Y', strtotime($to_date)) ?>
-                is <strong>above the per-product average</strong> for the same period.
-                Useful for spotting which menu items are driving revenue.
+                Products selling above the average for
+                <?= date('M j', strtotime($from_date)) ?>&ndash;<?= date('M j, Y', strtotime($to_date)) ?>.
             </p>
             <div class="table-container">
                 <table>
@@ -284,29 +282,14 @@
                             <th>Product</th>
                             <th>Category</th>
                             <th>Units Sold</th>
-                            <th>Revenue</th>
-                            <th>Vs. Average</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                            // Compute the average from the result set so we can
-                            // show "+N units above average" per row.
-                            $period_avg = 0;
-                            if (!empty($top_products)) {
-                                $sum = 0;
-                                foreach ($top_products as $tp) { $sum += (int) $tp['Total_Sold']; }
-                                $period_avg = $sum / count($top_products);
-                            }
-                        ?>
                         <?php foreach ($top_products as $tp): ?>
-                            <?php $delta = (int) $tp['Total_Sold'] - $period_avg; ?>
                             <tr>
-                                <td><strong><?= htmlspecialchars($tp['Product_Name']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars($tp['Name']) ?></strong></td>
                                 <td><span class="badge badge-category"><?= htmlspecialchars($tp['Category_Name']) ?></span></td>
-                                <td><?= (int) $tp['Total_Sold'] ?></td>
-                                <td><strong>P<?= number_format((float) $tp['Total_Revenue'], 2) ?></strong></td>
-                                <td class="text-success">+<?= number_format($delta, 1) ?> units</td>
+                                <td><strong><?= (int) $tp['Total_Sold'] ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
