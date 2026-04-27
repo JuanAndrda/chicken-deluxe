@@ -466,5 +466,89 @@ END$$
 DELIMITER ;
 
 -- ============================================
+-- PARTS-INVENTORY MIGRATION (added 2026-04-27)
+-- Change-logging triggers for Part and Product_Part.
+-- Same pattern as Product/User triggers above: User_ID = NULL,
+-- JSON_OBJECT for OLD/NEW snapshots, single-line Details summary.
+--
+-- Product_Part has no UPDATE trigger — recipe rows are
+-- delete+insert, never updated in place.
+-- ============================================
+
+-- --- PART ---
+DROP TRIGGER IF EXISTS trg_log_part_insert;
+DELIMITER $$
+CREATE TRIGGER trg_log_part_insert
+AFTER INSERT ON Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'INSERT', 'INSERT', 'Part', NULL,
+        JSON_OBJECT('Part_ID', NEW.Part_ID, 'Name', NEW.Name,
+            'Unit', NEW.Unit, 'Active', NEW.Active),
+        CONCAT('New record inserted into Part ID:', NEW.Part_ID), NOW());
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_log_part_update;
+DELIMITER $$
+CREATE TRIGGER trg_log_part_update
+AFTER UPDATE ON Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'UPDATE', 'UPDATE', 'Part',
+        JSON_OBJECT('Part_ID', OLD.Part_ID, 'Name', OLD.Name,
+            'Unit', OLD.Unit, 'Active', OLD.Active),
+        JSON_OBJECT('Part_ID', NEW.Part_ID, 'Name', NEW.Name,
+            'Unit', NEW.Unit, 'Active', NEW.Active),
+        CONCAT('Record updated in Part ID:', NEW.Part_ID), NOW());
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_log_part_delete;
+DELIMITER $$
+CREATE TRIGGER trg_log_part_delete
+AFTER DELETE ON Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'DELETE', 'DELETE', 'Part',
+        JSON_OBJECT('Part_ID', OLD.Part_ID, 'Name', OLD.Name,
+            'Unit', OLD.Unit, 'Active', OLD.Active),
+        NULL, CONCAT('Record deleted from Part ID:', OLD.Part_ID), NOW());
+END$$
+DELIMITER ;
+
+-- --- PRODUCT_PART (no UPDATE trigger — recipe rows are replaced not updated) ---
+DROP TRIGGER IF EXISTS trg_log_product_part_insert;
+DELIMITER $$
+CREATE TRIGGER trg_log_product_part_insert
+AFTER INSERT ON Product_Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'INSERT', 'INSERT', 'Product_Part', NULL,
+        JSON_OBJECT('Product_Part_ID', NEW.Product_Part_ID, 'Product_ID', NEW.Product_ID,
+            'Part_ID', NEW.Part_ID, 'Quantity_needed', NEW.Quantity_needed),
+        CONCAT('New recipe row inserted: Product_Part ID:', NEW.Product_Part_ID), NOW());
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_log_product_part_delete;
+DELIMITER $$
+CREATE TRIGGER trg_log_product_part_delete
+AFTER DELETE ON Product_Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'DELETE', 'DELETE', 'Product_Part',
+        JSON_OBJECT('Product_Part_ID', OLD.Product_Part_ID, 'Product_ID', OLD.Product_ID,
+            'Part_ID', OLD.Part_ID, 'Quantity_needed', OLD.Quantity_needed),
+        NULL, CONCAT('Recipe row deleted: Product_Part ID:', OLD.Product_Part_ID), NOW());
+END$$
+DELIMITER ;
+
+-- ============================================
 -- End of triggers
 -- ============================================
