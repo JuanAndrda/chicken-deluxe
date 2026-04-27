@@ -24,10 +24,10 @@
         <a href="<?= BASE_URL ?>/dashboard" class="nav-link <?= isActive('/dashboard', $current_path) ?>">Dashboard</a>
 
         <?php if (Auth::isOwner() || Auth::isStaff()): ?>
+            <a href="<?= BASE_URL ?>/sales"     class="nav-link <?= isActive('/sales', $current_path) ?>">Point of Sales</a>
+            <a href="<?= BASE_URL ?>/expenses"  class="nav-link <?= isActive('/expenses', $current_path) ?>">Expenses</a>
             <a href="<?= BASE_URL ?>/inventory" class="nav-link <?= isActive('/inventory', $current_path) ?>">Inventory</a>
-            <a href="<?= BASE_URL ?>/delivery" class="nav-link <?= isActive('/delivery', $current_path) ?>">Deliveries</a>
-            <a href="<?= BASE_URL ?>/sales" class="nav-link <?= isActive('/sales', $current_path) ?>">Sales</a>
-            <a href="<?= BASE_URL ?>/expenses" class="nav-link <?= isActive('/expenses', $current_path) ?>">Expenses</a>
+            <a href="<?= BASE_URL ?>/delivery"  class="nav-link <?= isActive('/delivery', $current_path) ?>">Deliveries</a>
         <?php endif; ?>
 
         <?php if (Auth::isOwner() || Auth::isAuditor()): ?>

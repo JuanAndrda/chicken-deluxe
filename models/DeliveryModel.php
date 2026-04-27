@@ -84,4 +84,14 @@ class DeliveryModel extends Model
             [$quantity, $delivery_id]
         );
     }
+
+    /** Create a pullout record (stock removed from kiosk) */
+    public function createPullout(int $kiosk_id, int $user_id, int $product_id, string $date, int $quantity, string $notes = ''): int
+    {
+        return $this->db->insert(
+            "INSERT INTO Delivery (Kiosk_ID, User_ID, Product_ID, Delivery_Date, Quantity, Type, Notes)
+             VALUES (?, ?, ?, ?, ?, 'Pullout', ?)",
+            [$kiosk_id, $user_id, $product_id, $date, $quantity, $notes]
+        );
+    }
 }

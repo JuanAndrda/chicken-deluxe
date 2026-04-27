@@ -10,7 +10,7 @@
 ?>
 <section class="sales">
     <div class="section-header">
-        <h2>Sales — <?= htmlspecialchars($kiosk['Name'] ?? 'Unknown') ?></h2>
+        <h2>Point of Sales — <?= htmlspecialchars($kiosk['Name'] ?? 'Unknown') ?></h2>
         <span class="date-display"><?= date('l, F j, Y', strtotime($date)) ?></span>
     </div>
 
@@ -93,14 +93,34 @@
                     <div class="pos-product-grid sales-product-grid" id="salesProductGrid">
                         <?php foreach ($products as $category => $items): ?>
                             <?php foreach ($items as $product): ?>
-                                <?php $imgUrl = ProductModel::getProductImagePath($product['Name']); ?>
-                                <button type="button" class="pos-product-card"
-                                        data-id="<?= $product['Product_ID'] ?>"
+                                <?php
+                                    $imgUrl  = ProductModel::getProductImagePath($product['Name']);
+                                    $pid     = (int) $product['Product_ID'];
+                                    // stock_map only populated for today; null = no beginning recorded
+                                    $has_inv = array_key_exists($pid, $stock_map ?? []);
+                                    $stock   = $has_inv ? ($stock_map[$pid] ?? 0) : null;
+                                    $avail   = ($stock === null) ? 0 : ($stock > 0 ? 1 : 0);
+                                    // Badge text
+                                    if (!$is_today) {
+                                        $badge_txt = ''; $badge_cls = '';
+                                    } elseif ($stock === null) {
+                                        $badge_txt = 'No Inventory'; $badge_cls = 'pos-stock-none';
+                                    } elseif ($stock <= 0) {
+                                        $badge_txt = 'Out of Stock'; $badge_cls = 'pos-stock-none';
+                                    } else {
+                                        $badge_txt = 'Stock: ' . $stock . ' pcs'; $badge_cls = 'pos-stock-ok';
+                                    }
+                                ?>
+                                <button type="button"
+                                        class="pos-product-card <?= ($is_today && !$avail) ? 'pos-unavailable' : '' ?>"
+                                        data-id="<?= $pid ?>"
                                         data-name="<?= htmlspecialchars($product['Name']) ?>"
                                         data-price="<?= $product['Price'] ?>"
                                         data-unit="<?= htmlspecialchars($product['Unit']) ?>"
                                         data-img="<?= htmlspecialchars($imgUrl) ?>"
-                                        data-category="<?= htmlspecialchars($category) ?>">
+                                        data-category="<?= htmlspecialchars($category) ?>"
+                                        data-available="<?= $avail ?>"
+                                        data-stock="<?= $stock ?? 'null' ?>">
                                     <img class="pos-product-img"
                                          src="<?= htmlspecialchars($imgUrl) ?>"
                                          alt="<?= htmlspecialchars($product['Name']) ?>"
@@ -111,6 +131,11 @@
                                     <span class="pos-product-price">
                                         P<?= number_format($product['Price'], 2) ?>
                                     </span>
+                                    <?php if ($is_today && $badge_txt): ?>
+                                        <span class="pos-stock-badge <?= $badge_cls ?>">
+                                            <?= $badge_txt ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </button>
                             <?php endforeach; ?>
                         <?php endforeach; ?>
@@ -364,6 +389,12 @@
         grid.addEventListener('click', function (e) {
             const card = e.target.closest('.pos-product-card');
             if (!card) return;
+            // Block unavailable products (no inventory or out of stock)
+            if (card.dataset.available === '0') {
+                card.classList.add('card-shake');
+                setTimeout(() => card.classList.remove('card-shake'), 400);
+                return;
+            }
             const id = card.dataset.id;
             const p  = productMap[id];
             if (!p) return;

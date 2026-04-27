@@ -6,6 +6,7 @@ require_once __DIR__ . '/../models/SalesModel.php';
 require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/KioskModel.php';
 require_once __DIR__ . '/../models/AuditLogModel.php';
+require_once __DIR__ . '/../models/InventoryModel.php';
 
 class SalesController extends Controller
 {
@@ -13,13 +14,15 @@ class SalesController extends Controller
     private ProductModel $productModel;
     private KioskModel $kioskModel;
     private AuditLogModel $auditLog;
+    private InventoryModel $inventoryModel;
 
     public function __construct()
     {
-        $this->salesModel   = new SalesModel();
-        $this->productModel = new ProductModel();
-        $this->kioskModel   = new KioskModel();
-        $this->auditLog     = new AuditLogModel();
+        $this->salesModel     = new SalesModel();
+        $this->productModel   = new ProductModel();
+        $this->kioskModel     = new KioskModel();
+        $this->auditLog       = new AuditLogModel();
+        $this->inventoryModel = new InventoryModel();
     }
 
     /** Show sales page (POS-style) */
@@ -39,8 +42,17 @@ class SalesController extends Controller
             if ($s['Locked_status']) { $any_locked = true; break; }
         }
 
+        // Build stock map: Product_ID => Running_Qty (null = no beginning recorded)
+        $stock_map = [];
+        if ($is_today) {
+            $running = $this->inventoryModel->getRunningInventory($date, $kiosk_id);
+            foreach ($running as $row) {
+                $stock_map[(int) $row['Product_ID']] = (int) $row['Running_Qty'];
+            }
+        }
+
         $data = [
-            'page_title'   => 'Sales',
+            'page_title'   => 'Point of Sales',
             'kiosk'        => $kiosk,
             'kiosk_id'    => $kiosk_id,
             'date'         => $date,
@@ -50,6 +62,7 @@ class SalesController extends Controller
             'any_locked'   => $any_locked,
             'products'     => $this->productModel->getActiveGrouped(),
             'product_map'  => $this->productModel->getActiveAsMap(),
+            'stock_map'    => $stock_map,
             'kiosks'       => Auth::isOwner() ? $this->kioskModel->getActive() : [],
             'history'      => $this->salesModel->getRecordedDates($kiosk_id),
             'success'      => $_GET['success'] ?? null,

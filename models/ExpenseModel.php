@@ -17,6 +17,18 @@ class ExpenseModel extends Model
         );
     }
 
+    /** Get combined expense total for a date across ALL kiosks */
+    public function getDailyTotalAllKiosks(string $date): float
+    {
+        $row = $this->db->readOne(
+            "SELECT COALESCE(SUM(Amount), 0) AS total
+             FROM Expenses
+             WHERE Expense_date = ?",
+            [$date]
+        );
+        return (float) ($row['total'] ?? 0);
+    }
+
     /** Get daily expense total for a date and kiosk */
     public function getDailyTotal(string $date, int $kiosk_id): float
     {

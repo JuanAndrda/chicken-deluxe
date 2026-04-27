@@ -7,18 +7,21 @@
 require_once __DIR__ . '/../models/SalesModel.php';
 require_once __DIR__ . '/../models/InventoryModel.php';
 require_once __DIR__ . '/../models/KioskModel.php';
+require_once __DIR__ . '/../models/ExpenseModel.php';
 
 class DashboardController extends Controller
 {
     private SalesModel $salesModel;
     private InventoryModel $inventoryModel;
     private KioskModel $kioskModel;
+    private ExpenseModel $expenseModel;
 
     public function __construct()
     {
         $this->salesModel     = new SalesModel();
         $this->inventoryModel = new InventoryModel();
         $this->kioskModel     = new KioskModel();
+        $this->expenseModel   = new ExpenseModel();
     }
 
     /** Show the dashboard */
@@ -73,6 +76,7 @@ class DashboardController extends Controller
         return [
             'today_sales_by_kiosk'     => $today_sales_by_kiosk,
             'grand_total_today'        => array_sum(array_column($today_sales_by_kiosk, 'Day_Total')),
+            'total_expenses_today'     => $this->expenseModel->getDailyTotalAllKiosks($today),
             'kiosk_inventory_status'   => $kiosk_inventory_status,
             'kiosks_missing_beginning' => $missing_beginning,
             'kiosks_missing_ending'    => $missing_ending,
@@ -99,6 +103,7 @@ class DashboardController extends Controller
             'kiosk'                     => $kiosk,
             'kiosk_name'                => $kiosk['Name'] ?? null,
             'today_sales_total'         => $today_sales_total,
+            'today_expenses_total'      => $kiosk_id ? $this->expenseModel->getDailyTotal($today, $kiosk_id) : 0.0,
             'has_beginning_today'       => $has_beginning_today,
             'has_ending_today'          => $has_ending_today,
             'previous_ending_available' => $previous_ending_available,

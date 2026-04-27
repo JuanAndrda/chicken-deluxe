@@ -21,9 +21,9 @@ $fmt = static function (float $n): string {
         ============================================================ */ ?>
 <?php if (Auth::isOwner()): ?>
     <?php
-        $missing_actions = ($kiosks_missing_beginning ?? 0) + ($kiosks_missing_ending ?? 0);
         // Stat color logic
         $sales_class = ($grand_total_today ?? 0) > 0 ? 'card-green' : 'card-gray';
+        $exp_class   = ($total_expenses_today ?? 0) > 0 ? 'card-amber' : 'card-gray';
         if ($total_kiosks > 0 && $kiosks_have_beginning === $total_kiosks) {
             $beg_class = 'card-green';
         } elseif ($kiosks_have_beginning > 0) {
@@ -38,7 +38,6 @@ $fmt = static function (float $n): string {
         } else {
             $end_class = 'card-gray';
         }
-        $action_class = $missing_actions > 0 ? 'card-red' : 'card-green';
 
         // Map sales totals by Kiosk_ID for fast lookup in the status grid
         $sales_map = [];
@@ -56,8 +55,14 @@ $fmt = static function (float $n): string {
     <!-- Section 2: Summary Stat Cards -->
     <div class="dash-stat-cards">
         <div class="dash-stat-card <?= $sales_class ?>">
+            <div class="dash-stat-label" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Today's Sales</div>
             <div class="dash-stat-value"><?= $fmt((float) $grand_total_today) ?></div>
-            <div class="dash-stat-label">Across all kiosks today</div>
+            <div class="dash-stat-label">Across all kiosks</div>
+        </div>
+        <div class="dash-stat-card <?= $exp_class ?>">
+            <div class="dash-stat-label" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total Expenses Today</div>
+            <div class="dash-stat-value"><?= $fmt((float) ($total_expenses_today ?? 0)) ?></div>
+            <div class="dash-stat-label">Across all kiosks</div>
         </div>
         <div class="dash-stat-card <?= $beg_class ?>">
             <div class="dash-stat-value"><?= $kiosks_have_beginning ?> of <?= $total_kiosks ?></div>
@@ -66,14 +71,6 @@ $fmt = static function (float $n): string {
         <div class="dash-stat-card <?= $end_class ?>">
             <div class="dash-stat-value"><?= $kiosks_have_ending ?> of <?= $total_kiosks ?></div>
             <div class="dash-stat-label">Have recorded ending stock</div>
-        </div>
-        <div class="dash-stat-card <?= $action_class ?>">
-            <div class="dash-stat-value">
-                <?= $missing_actions > 0 ? $missing_actions : 'All good' ?>
-            </div>
-            <div class="dash-stat-label">
-                <?= $missing_actions > 0 ? 'Items need attention' : 'No pending items' ?>
-            </div>
         </div>
     </div>
 
@@ -204,10 +201,15 @@ $fmt = static function (float $n): string {
     </div>
 
     <!-- Section 2: Today's Progress -->
+    <?php $staff_exp_class = ($today_expenses_total ?? 0) > 0 ? 'card-amber' : 'card-gray'; ?>
     <div class="dash-stat-cards">
         <div class="dash-stat-card <?= $sales_class ?>">
             <div class="dash-stat-value"><?= $fmt((float) ($today_sales_total ?? 0)) ?></div>
             <div class="dash-stat-label">Sales recorded today</div>
+        </div>
+        <div class="dash-stat-card <?= $staff_exp_class ?>">
+            <div class="dash-stat-value"><?= $fmt((float) ($today_expenses_total ?? 0)) ?></div>
+            <div class="dash-stat-label">Total Expenses Today</div>
         </div>
         <div class="dash-stat-card <?= $beg_class ?>">
             <div class="dash-stat-value">

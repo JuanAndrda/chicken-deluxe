@@ -2664,3 +2664,169 @@ tr:hover {
     .inventory-step-status { font-size: 12px; padding: 10px 16px; }
     .inventory-step-panel { padding: 16px; }
 }
+
+/* ================================================================
+   CHANGE 4 — POS Stock Availability
+   ================================================================ */
+.pos-stock-badge {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+.pos-stock-ok {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+.pos-stock-none {
+    background: #FFEBEE;
+    color: #C62828;
+}
+.pos-unavailable {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(60%);
+}
+.pos-unavailable:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+@keyframes cardShake {
+    0%,100% { transform: translateX(0); }
+    25%      { transform: translateX(-5px); }
+    75%      { transform: translateX(5px); }
+}
+.card-shake {
+    animation: cardShake 0.35s ease;
+}
+
+/* ================================================================
+   CHANGE 5 — Delivery Product Table + Pullout
+   ================================================================ */
+.delivery-product-table-wrap {
+    overflow-x: auto;
+    margin-top: 8px;
+}
+.delivery-select-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.delivery-select-table th,
+.delivery-select-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #F0F0F0;
+    text-align: left;
+    font-size: 14px;
+}
+.delivery-select-table th {
+    background: #F8F9FA;
+    font-weight: 600;
+    color: #555;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+.delivery-product-row:hover {
+    background: #F5F8FF;
+    cursor: pointer;
+}
+.delivery-product-row.selected-row {
+    background: #EEF4FF;
+    border-left: 3px solid var(--primary);
+}
+.badge-delivery {
+    background: #E3F2FD;
+    color: #1565C0;
+}
+.badge-pullout {
+    background: #FFF3E0;
+    color: #E65100;
+}
+.pullout-panel {
+    background: #FFF8F0;
+    border: 1px solid #FFD8A8;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 0 0 16px 0;
+}
+.pullout-panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 14px 0;
+    color: #E65100;
+}
+.pullout-form .pullout-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+}
+.pullout-submit-btn {
+    display: flex;
+    gap: 8px;
+}
+
+/* ================================================================
+   CHANGE 6 — Admin Users Time In/Out Tab
+   ================================================================ */
+.admin-users-tab-nav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid #E0E0E0;
+    margin-bottom: 20px;
+}
+.admin-users-tab-btn {
+    padding: 10px 22px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #777;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    border-radius: 4px 4px 0 0;
+}
+.admin-users-tab-btn:hover  { color: var(--primary); }
+.admin-users-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: #F5F8FF;
+}
+.admin-users-tab-panel { display: none; }
+.admin-users-tab-panel.active { display: block; }
+
+/* Sub-tabs inside Time In/Out */
+.timein-sub-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.timein-sub-btn {
+    padding: 8px 20px;
+    background: #F0F0F0;
+    border: 1px solid #DDD;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.timein-sub-btn:hover { background: #E0E8FF; color: var(--primary); }
+.timein-sub-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+.timein-sub-panel { display: none; }
+.timein-sub-panel.active { display: block; }
+
+/* Hours-worked color coding */
+.hours-normal   { color: #2E7D32; font-weight: 700; }
+.hours-warning  { color: #E65100; font-weight: 700; }
+.hours-overtime { color: #6A1A9A; font-weight: 700; }

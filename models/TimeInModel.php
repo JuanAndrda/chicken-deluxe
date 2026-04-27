@@ -43,4 +43,46 @@ class TimeInModel extends Model
 
         return $this->db->read($sql, $params);
     }
+
+    /** Get currently active sessions (timed in, no time_out yet) */
+    public function getActiveToday(): array
+    {
+        return $this->db->read(
+            "SELECT t.*, u.Full_name, u.Username, k.Name AS Kiosk_Name
+             FROM Time_in t
+             JOIN User u ON t.User_ID = u.User_ID
+             JOIN Kiosk k ON t.Kiosk_ID = k.Kiosk_ID
+             WHERE DATE(t.Timestamp) = CURDATE()
+               AND t.Time_out IS NULL
+             ORDER BY t.Timestamp DESC",
+            []
+        );
+    }
+
+    /** Get completed sessions today (has time_out) with TIMEDIFF hours worked */
+    public function getCompletedToday(): array
+    {
+        return $this->db->read(
+            "SELECT t.*,
+                    u.Full_name, u.Username, k.Name AS Kiosk_Name,
+                    ROUND(TIME_TO_SEC(TIMEDIFF(t.Time_out, t.Timestamp)) / 3600, 2) AS Hours_Worked
+             FROM Time_in t
+             JOIN User u ON t.User_ID = u.User_ID
+             JOIN Kiosk k ON t.Kiosk_ID = k.Kiosk_ID
+             WHERE DATE(t.Timestamp) = CURDATE()
+               AND t.Time_out IS NOT NULL
+             ORDER BY t.Time_out DESC",
+            []
+        );
+    }
+
+    /** Record time-out for a session */
+    public function recordTimeOut(int $timein_id): int
+    {
+        return $this->db->write(
+            "UPDATE Time_in SET Time_out = NOW()
+             WHERE Timein_ID = ? AND Time_out IS NULL",
+            [$timein_id]
+        );
+    }
 }

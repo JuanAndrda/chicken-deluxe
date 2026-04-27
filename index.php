@@ -36,6 +36,7 @@ $router->post('/admin/users/update',  'AdminController', 'updateUser');
 $router->post('/admin/users/reset-password', 'AdminController', 'resetUserPassword');
 $router->post('/admin/users/deactivate', 'AdminController', 'deactivateUser');
 $router->post('/admin/users/activate',   'AdminController', 'activateUser');
+$router->post('/admin/users/timeout',    'AdminController', 'timeout');
 $router->get('/admin/products',          'AdminController', 'products');
 $router->post('/admin/products/create',  'AdminController', 'createProduct');
 $router->post('/admin/products/update',  'AdminController', 'updateProduct');
@@ -56,7 +57,8 @@ $router->post('/delivery/store',   'DeliveryController', 'store');
 $router->post('/delivery/lock',    'DeliveryController', 'lock');
 $router->post('/delivery/unlock',  'DeliveryController', 'unlock');
 $router->post('/delivery/delete',  'DeliveryController', 'delete');
-$router->post('/delivery/update',  'DeliveryController', 'update');
+$router->post('/delivery/update',   'DeliveryController', 'update');
+$router->post('/delivery/pullout',  'DeliveryController', 'pullout');
 
 // -- Sales routes --
 $router->get('/sales',          'SalesController', 'index');

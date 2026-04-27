@@ -185,6 +185,38 @@ class DeliveryController extends Controller
         }
     }
 
+    /** Record a pullout (stock removed) */
+    public function pullout(): void
+    {
+        Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/delivery?error=Invalid+request');
+            return;
+        }
+
+        $kiosk_id   = $this->resolveKiosk();
+        $product_id = (int) $this->post('product_id');
+        $quantity   = (int) $this->post('quantity');
+        $notes      = trim($this->post('notes', ''));
+        $date       = $this->post('date', date('Y-m-d'));
+
+        if ($this->isFutureDate($date)) {
+            $this->redirect('/delivery?error=Cannot+record+pullouts+for+future+dates');
+            return;
+        }
+
+        if ($product_id <= 0 || $quantity <= 0) {
+            $this->redirect("/delivery?date={$date}&error=Product+and+quantity+are+required");
+            return;
+        }
+
+        $delivery_id = $this->deliveryModel->createPullout($kiosk_id, Auth::userId(), $product_id, $date, $quantity, $notes);
+        $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Pullout ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
+
+        $this->redirect("/delivery?date={$date}&kiosk_id={$kiosk_id}&success=Pullout+recorded");
+    }
+
     /** Determine which kiosk to use */
     private function resolveKiosk(): int
     {

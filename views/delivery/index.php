@@ -137,44 +137,46 @@
                     </div>
                 </div>
 
-                <!-- Product grid -->
+                <!-- Product table -->
                 <div class="delivery-grid-section">
                     <h3 class="delivery-grid-title">Select Product</h3>
-
-                    <div class="pos-category-tabs" style="margin-bottom:16px;">
-                        <button class="pos-cat-btn active" data-category="all">All</button>
-                        <?php foreach ($products as $category => $items): ?>
-                            <button class="pos-cat-btn" data-category="<?= htmlspecialchars($category) ?>">
-                                <?= htmlspecialchars($category) ?>
-                            </button>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <div class="pos-product-grid delivery-product-grid" id="deliveryProductGrid">
-                        <?php foreach ($products as $category => $items): ?>
-                            <?php foreach ($items as $product): ?>
-                                <?php $imgUrl = ProductModel::getProductImagePath($product['Name']); ?>
-                                <button type="button"
-                                        class="pos-product-card delivery-product-card"
-                                        data-id="<?= $product['Product_ID'] ?>"
-                                        data-name="<?= htmlspecialchars($product['Name']) ?>"
-                                        data-price="<?= $product['Price'] ?>"
-                                        data-unit="<?= htmlspecialchars($product['Unit']) ?>"
-                                        data-img="<?= htmlspecialchars($imgUrl) ?>"
-                                        data-category="<?= htmlspecialchars($category) ?>">
-                                    <img class="pos-product-img"
-                                         src="<?= htmlspecialchars($imgUrl) ?>"
-                                         alt="<?= htmlspecialchars($product['Name']) ?>"
-                                         loading="lazy">
-                                    <span class="pos-product-name">
-                                        <?= htmlspecialchars($product['Name']) ?>
-                                    </span>
-                                    <span class="pos-product-price">
-                                        <?= htmlspecialchars($product['Unit']) ?>
-                                    </span>
-                                </button>
-                            <?php endforeach; ?>
-                        <?php endforeach; ?>
+                    <div class="delivery-product-table-wrap">
+                        <table class="delivery-select-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Unit</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveryProductGrid">
+                                <?php foreach ($products as $category => $items): ?>
+                                    <?php foreach ($items as $product): ?>
+                                        <?php $imgUrl = ProductModel::getProductImagePath($product['Name']); ?>
+                                        <tr class="delivery-product-row"
+                                            data-id="<?= $product['Product_ID'] ?>"
+                                            data-name="<?= htmlspecialchars($product['Name']) ?>"
+                                            data-unit="<?= htmlspecialchars($product['Unit']) ?>"
+                                            data-img="<?= htmlspecialchars($imgUrl) ?>"
+                                            data-category="<?= htmlspecialchars($category) ?>">
+                                            <td><?= htmlspecialchars($product['Name']) ?></td>
+                                            <td>
+                                                <span class="badge badge-category">
+                                                    <?= htmlspecialchars($category) ?>
+                                                </span>
+                                            </td>
+                                            <td><?= htmlspecialchars($product['Unit']) ?></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-primary delivery-select-btn">
+                                                    Select
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -204,6 +206,12 @@
                     <?php endif; ?>
                 </div>
                 <div class="section-header-right">
+                    <?php if ($is_today && !$any_locked): ?>
+                        <button type="button" class="btn btn-outline" id="pulloutToggleBtn"
+                                onclick="togglePulloutPanel()">
+                            📤 Record Pullout
+                        </button>
+                    <?php endif; ?>
                     <?php if ($is_today && !$any_locked && !empty($deliveries) && Auth::isOwner()): ?>
                         <form method="POST" action="<?= BASE_URL ?>/delivery/lock"
                               onsubmit="return confirm('Lock all delivery records for today?')">
@@ -215,6 +223,51 @@
                     <?php endif; ?>
                 </div>
             </div>
+
+            <!-- Pullout Panel (hidden by default) -->
+            <?php if ($is_today && !$any_locked): ?>
+            <div id="pulloutPanel" class="pullout-panel" style="display:none;">
+                <h4 class="pullout-panel-title">📤 Record Pullout</h4>
+                <form method="POST" action="<?= BASE_URL ?>/delivery/pullout" class="pullout-form">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                    <input type="hidden" name="kiosk_id"   value="<?= $kiosk_id ?>">
+                    <input type="hidden" name="date"       value="<?= $date ?>">
+                    <div class="pullout-fields">
+                        <div class="form-group" style="flex:1 1 200px;">
+                            <label for="pulloutProduct">Product</label>
+                            <select id="pulloutProduct" name="product_id" class="form-select" required>
+                                <option value="">— Select product —</option>
+                                <?php foreach ($products as $category => $items): ?>
+                                    <optgroup label="<?= htmlspecialchars($category) ?>">
+                                        <?php foreach ($items as $p): ?>
+                                            <option value="<?= $p['Product_ID'] ?>">
+                                                <?= htmlspecialchars($p['Name']) ?>
+                                                (<?= htmlspecialchars($p['Unit']) ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:0 0 120px;">
+                            <label for="pulloutQty">Quantity</label>
+                            <input type="number" id="pulloutQty" name="quantity"
+                                   class="form-input" min="1" value="1" required>
+                        </div>
+                        <div class="form-group" style="flex:2 1 260px;">
+                            <label for="pulloutNotes">Reason / Notes</label>
+                            <input type="text" id="pulloutNotes" name="notes"
+                                   class="form-input" placeholder="e.g. Expired, returned to supplier">
+                        </div>
+                        <div class="form-group pullout-submit-btn" style="align-self:flex-end;">
+                            <button type="submit" class="btn btn-primary">Record Pullout</button>
+                            <button type="button" class="btn btn-outline"
+                                    onclick="togglePulloutPanel()">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
 
             <?php if (empty($deliveries)): ?>
                 <div class="empty-state-card">
@@ -243,8 +296,9 @@
                             <tr>
                                 <th>Product</th>
                                 <th>Category</th>
+                                <th>Type</th>
                                 <th>Quantity</th>
-                                <th>Unit</th>
+                                <th>Notes</th>
                                 <th>Recorded By</th>
                                 <th>Time</th>
                                 <th>Status</th>
@@ -261,8 +315,13 @@
                                             <?= htmlspecialchars($d['Category_Name'] ?? '—') ?>
                                         </span>
                                     </td>
+                                    <td>
+                                        <span class="badge <?= ($d['Type'] ?? 'Delivery') === 'Pullout' ? 'badge-pullout' : 'badge-delivery' ?>">
+                                            <?= htmlspecialchars($d['Type'] ?? 'Delivery') ?>
+                                        </span>
+                                    </td>
                                     <td><strong><?= $d['Quantity'] ?></strong></td>
-                                    <td><?= htmlspecialchars($d['Unit']) ?></td>
+                                    <td><?= htmlspecialchars($d['Notes'] ?? '—') ?></td>
                                     <td><?= htmlspecialchars($d['Recorded_by'] ?? '—') ?></td>
                                     <td style="white-space:nowrap;">
                                         <?= date('g:i A', strtotime($d['Created_at'])) ?>
@@ -318,7 +377,7 @@
                                 <?php if (!$d['Locked_status'] && Auth::isOwner()): ?>
                                     <tr id="delivery-edit-<?= $d['Delivery_ID'] ?>"
                                         class="inline-edit-row" style="display:none;">
-                                        <td colspan="<?= Auth::isOwner() ? 8 : 7 ?>">
+                                        <td colspan="<?= Auth::isOwner() ? 9 : 8 ?>">
                                             <form method="POST" action="<?= BASE_URL ?>/delivery/update"
                                                   class="inline-edit-form">
                                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
@@ -377,44 +436,32 @@
         });
     });
 
-    // ============ PRODUCT GRID ============
+    // ============ PRODUCT TABLE ============
     const grid       = document.getElementById('deliveryProductGrid');
     const entryPanel = document.getElementById('deliveryEntryPanel');
-    let selectedCard = null;
+    let selectedRow  = null;
 
     if (grid) {
-        // Category filter
-        document.querySelectorAll('.pos-cat-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.pos-cat-btn')
-                        .forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                const cat = this.dataset.category;
-                grid.querySelectorAll('.delivery-product-card').forEach(function(card) {
-                    card.style.display =
-                        (cat === 'all' || card.dataset.category === cat) ? '' : 'none';
-                });
-            });
-        });
-
-        // Card click — populate entry panel above grid
+        // Row select button click — populate entry panel above table
         grid.addEventListener('click', function(e) {
-            const card = e.target.closest('.delivery-product-card');
-            if (!card) return;
+            const btn = e.target.closest('.delivery-select-btn');
+            if (!btn) return;
+            const row = btn.closest('.delivery-product-row');
+            if (!row) return;
 
-            if (selectedCard) selectedCard.classList.remove('selected');
-            selectedCard = card;
-            card.classList.add('selected');
+            if (selectedRow) selectedRow.classList.remove('selected-row');
+            selectedRow = row;
+            row.classList.add('selected-row');
 
-            const id   = card.dataset.id;
-            const name = card.dataset.name;
-            const unit = card.dataset.unit;
-            const img  = card.dataset.img;
+            const id   = row.dataset.id;
+            const name = row.dataset.name;
+            const unit = row.dataset.unit;
+            const img  = row.dataset.img;
 
-            document.getElementById('entryProductId').value     = id;
+            document.getElementById('entryProductId').value        = id;
             document.getElementById('entryProductName').textContent = name;
             document.getElementById('entryProductMeta').textContent = 'Unit: ' + unit;
-            document.getElementById('entryQtyInput').value      = 1;
+            document.getElementById('entryQtyInput').value         = 1;
 
             const imgEl = document.getElementById('entryProductImg');
             if (imgEl) {
@@ -432,9 +479,9 @@
     if (cancelBtn) {
         cancelBtn.addEventListener('click', function() {
             entryPanel.style.display = 'none';
-            if (selectedCard) {
-                selectedCard.classList.remove('selected');
-                selectedCard = null;
+            if (selectedRow) {
+                selectedRow.classList.remove('selected-row');
+                selectedRow = null;
             }
             document.getElementById('entryProductId').value = '';
         });
@@ -468,5 +515,12 @@
 
     // Expose for empty-state shortcut button
     window.switchTab = switchTab;
+
+    // ============ PULLOUT PANEL TOGGLE ============
+    window.togglePulloutPanel = function() {
+        const panel = document.getElementById('pulloutPanel');
+        if (!panel) return;
+        panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    };
 })();
 </script>
