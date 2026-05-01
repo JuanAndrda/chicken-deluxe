@@ -354,7 +354,7 @@
 
                 <div class="running-inventory-header">
                     <p class="text-light running-inventory-formula" style="margin:0;">
-                        Beginning + Delivered &minus; Used by sales = Running stock
+                        Beginning + Delivered &minus; Pulled out &minus; Used by sales = Running stock
                     </p>
                     <div class="running-inventory-stats">
                         <span class="running-stat running-stat-neg" title="Negative — sold more than available">&#9888; <?= $neg_count ?></span>
@@ -380,6 +380,8 @@
                                 <span title="Beginning"><?= (int) $r['Beginning_Qty'] ?></span>
                                 <span class="running-op">+</span>
                                 <span title="Delivered today" class="running-delivered"><?= (int) $r['Delivered_Qty'] ?></span>
+                                <span class="running-op">&minus;</span>
+                                <span title="Pulled out today (expired / returned)" class="running-pullout"><?= (int) ($r['Pullout_Qty'] ?? 0) ?></span>
                                 <span class="running-op">&minus;</span>
                                 <span title="Used by sales today" class="running-sold"><?= (int) $r['Used_Qty'] ?></span>
                                 <span class="running-op">=</span>

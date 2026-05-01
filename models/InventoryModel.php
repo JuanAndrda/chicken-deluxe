@@ -482,7 +482,13 @@ class InventoryModel extends Model
 
     /**
      * Running PARTS inventory for a kiosk and date.
-     *   Running_Qty = Beginning + Delivered − ParticipatedInSales
+     *   Running_Qty = Beginning + Delivered − Pulled_Out − Used_by_Sales
+     *
+     * Delivery rows split by Type:
+     *   - Type='Delivery' → adds to inventory (incoming stock)
+     *   - Type='Pullout'  → subtracts from inventory (stock removed:
+     *                       expired, returned to supplier, broken, etc.)
+     *
      * Sales consumption is computed by joining Product_Part:
      *   for every Sales row, multiply Quantity_sold × parts_per_unit
      *   for each part used by the product, then sum per Part_ID.
@@ -492,14 +498,16 @@ class InventoryModel extends Model
         return $this->db->read(
             "SELECT
                 pt.Part_ID,
-                pt.Name                            AS Part_Name,
+                pt.Name                              AS Part_Name,
                 pt.Unit,
-                COALESCE(beg.Quantity, 0)          AS Beginning_Qty,
-                COALESCE(d.delivered, 0)           AS Delivered_Qty,
-                COALESCE(consumed.used_qty, 0)     AS Used_Qty,
+                COALESCE(beg.Quantity, 0)            AS Beginning_Qty,
+                COALESCE(d.delivered, 0)             AS Delivered_Qty,
+                COALESCE(po.pulled_out, 0)           AS Pullout_Qty,
+                COALESCE(consumed.used_qty, 0)       AS Used_Qty,
                 (COALESCE(beg.Quantity, 0)
                  + COALESCE(d.delivered, 0)
-                 - COALESCE(consumed.used_qty, 0)) AS Running_Qty
+                 - COALESCE(po.pulled_out, 0)
+                 - COALESCE(consumed.used_qty, 0))   AS Running_Qty
              FROM Part pt
              INNER JOIN Inventory_Snapshot beg
                     ON beg.Part_ID       = pt.Part_ID
@@ -512,8 +520,18 @@ class InventoryModel extends Model
                     WHERE  Kiosk_ID      = ?
                       AND  Delivery_Date = ?
                       AND  Part_ID       IS NOT NULL
+                      AND  Type          = 'Delivery'
                     GROUP  BY Part_ID
                 ) d ON d.Part_ID = pt.Part_ID
+             LEFT JOIN (
+                    SELECT Part_ID, SUM(Quantity) AS pulled_out
+                    FROM   Delivery
+                    WHERE  Kiosk_ID      = ?
+                      AND  Delivery_Date = ?
+                      AND  Part_ID       IS NOT NULL
+                      AND  Type          = 'Pullout'
+                    GROUP  BY Part_ID
+                ) po ON po.Part_ID = pt.Part_ID
              LEFT JOIN (
                     SELECT pp.Part_ID,
                            SUM(s.Quantity_sold * pp.Quantity_needed) AS used_qty
@@ -525,7 +543,7 @@ class InventoryModel extends Model
                 ) consumed ON consumed.Part_ID = pt.Part_ID
              WHERE pt.Active = 1
              ORDER BY pt.Name",
-            [$kiosk_id, $date, $kiosk_id, $date, $kiosk_id, $date]
+            [$kiosk_id, $date, $kiosk_id, $date, $kiosk_id, $date, $kiosk_id, $date]
         );
     }
 

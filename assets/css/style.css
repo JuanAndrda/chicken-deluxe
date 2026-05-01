@@ -3021,3 +3021,6 @@ tr:hover {
     border: 1px solid #E5EAF0;
     border-radius: 8px;
 }
+
+/* Running inventory: pullout amount (orange — matches Type='Pullout' badge color) */
+.running-pullout { color: #E65100; font-weight: 700; }
