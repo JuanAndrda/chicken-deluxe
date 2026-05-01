@@ -2938,3 +2938,54 @@ tr:hover {
     font-weight: 700;
     display: inline-block;
 }
+
+/* ================================================================
+   Collapsible "Add New X" forms (admin/products + admin/parts)
+   ================================================================ */
+.add-form-details {
+    margin-bottom: 16px;
+}
+.add-form-details > summary {
+    list-style: none;          /* hide default disclosure triangle */
+    cursor: pointer;
+}
+.add-form-details > summary::-webkit-details-marker { display: none; }
+
+.add-form-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: var(--primary, #E63946);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 8px;
+    border: none;
+    transition: filter .12s, transform .04s;
+    user-select: none;
+}
+.add-form-summary:hover  { filter: brightness(1.07); }
+.add-form-summary:active { transform: translateY(1px); }
+
+.add-form-summary-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* When expanded, rotate the + icon to an x for visual feedback */
+.add-form-details[open] > summary .add-form-summary-icon { transform: rotate(45deg); transition: transform .15s; }
+.add-form-details:not([open]) > summary .add-form-summary-icon { transform: rotate(0deg); transition: transform .15s; }
+
+/* The expanded card sits below the button with a small gap */
+.add-form-card {
+    margin-top: 12px;
+}

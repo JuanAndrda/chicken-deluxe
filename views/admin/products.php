@@ -44,50 +44,55 @@
             </div>
         <?php endif; ?>
 
-        <!-- Add Product Form -->
-        <div class="card form-card">
-            <h3>Add New Product</h3>
-            <form method="POST" action="<?= BASE_URL ?>/admin/products/create"
-                  class="form-inline-grid" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+        <!-- Add Product Form (collapsed by default) -->
+        <details class="add-form-details">
+            <summary class="add-form-summary">
+                <span class="add-form-summary-icon">+</span>
+                <span>Add New Product</span>
+            </summary>
+            <div class="card form-card add-form-card">
+                <form method="POST" action="<?= BASE_URL ?>/admin/products/create"
+                      class="form-inline-grid" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
 
-                <div class="form-group">
-                    <label for="name">Product Name</label>
-                    <input type="text" id="name" name="name" class="form-input" required>
-                </div>
+                    <div class="form-group">
+                        <label for="name">Product Name</label>
+                        <input type="text" id="name" name="name" class="form-input" required>
+                    </div>
 
-                <div class="form-group">
-                    <label for="category_id">Category</label>
-                    <select id="category_id" name="category_id" class="form-select" required>
-                        <option value="">Select Category</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?= $cat['Category_ID'] ?>"><?= htmlspecialchars($cat['Name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                    <div class="form-group">
+                        <label for="category_id">Category</label>
+                        <select id="category_id" name="category_id" class="form-select" required>
+                            <option value="">Select Category</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['Category_ID'] ?>"><?= htmlspecialchars($cat['Name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-                <div class="form-group">
-                    <label for="unit">Unit</label>
-                    <input type="text" id="unit" name="unit" class="form-input" value="pcs" required>
-                </div>
+                    <div class="form-group">
+                        <label for="unit">Unit</label>
+                        <input type="text" id="unit" name="unit" class="form-input" value="pcs" required>
+                    </div>
 
-                <div class="form-group">
-                    <label for="price">Price (P)</label>
-                    <input type="number" id="price" name="price" class="form-input" min="0" step="0.01" required>
-                </div>
+                    <div class="form-group">
+                        <label for="price">Price (P)</label>
+                        <input type="number" id="price" name="price" class="form-input" min="0" step="0.01" required>
+                    </div>
 
-                <div class="form-group">
-                    <label for="photo">Photo (optional)</label>
-                    <input type="file" id="photo" name="photo" class="form-input"
-                           accept="image/jpeg,image/png,image/webp">
-                    <small class="form-hint">JPG, PNG, or WEBP. Max 2MB.</small>
-                </div>
+                    <div class="form-group">
+                        <label for="photo">Photo (optional)</label>
+                        <input type="file" id="photo" name="photo" class="form-input"
+                               accept="image/jpeg,image/png,image/webp">
+                        <small class="form-hint">JPG, PNG, or WEBP. Max 2MB.</small>
+                    </div>
 
-                <div class="form-group form-actions">
-                    <button type="submit" class="btn btn-primary">Add Product</button>
-                </div>
-            </form>
-        </div>
+                    <div class="form-group form-actions">
+                        <button type="submit" class="btn btn-primary">Add Product</button>
+                    </div>
+                </form>
+            </div>
+        </details>
 
         <!-- Per-product hidden forms -->
         <?php foreach ($products as $product): ?>
@@ -263,38 +268,43 @@
     <div class="admin-products-tab-panel <?= $active_tab === 'parts' ? 'active' : '' ?>"
          id="adminPartsTab">
 
-        <!-- Add Part Form -->
-        <div class="card form-card">
-            <h3>Add New Part</h3>
-            <form method="POST" action="<?= BASE_URL ?>/admin/parts/create" class="form-inline-grid">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+        <!-- Add Part Form (collapsed by default) -->
+        <details class="add-form-details">
+            <summary class="add-form-summary">
+                <span class="add-form-summary-icon">+</span>
+                <span>Add New Part</span>
+            </summary>
+            <div class="card form-card add-form-card">
+                <form method="POST" action="<?= BASE_URL ?>/admin/parts/create" class="form-inline-grid">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
 
-                <div class="form-group">
-                    <label for="part_name">Part Name</label>
-                    <input type="text" id="part_name" name="name" class="form-input"
-                           placeholder="e.g. Mayonnaise, Sausage, Pork Skin" required>
-                </div>
+                    <div class="form-group">
+                        <label for="part_name">Part Name</label>
+                        <input type="text" id="part_name" name="name" class="form-input"
+                               placeholder="e.g. Mayonnaise, Sausage, Pork Skin" required>
+                    </div>
 
-                <div class="form-group">
-                    <label for="part_unit">Unit</label>
-                    <select id="part_unit" name="unit" class="form-select">
-                        <option value="pcs">pcs</option>
-                        <option value="cup">cup</option>
-                        <option value="pack">pack</option>
-                        <option value="bottle">bottle</option>
-                        <option value="can">can</option>
-                        <option value="tsp">tsp</option>
-                        <option value="kg">kg</option>
-                        <option value="g">g</option>
-                        <option value="ml">ml</option>
-                    </select>
-                </div>
+                    <div class="form-group">
+                        <label for="part_unit">Unit</label>
+                        <select id="part_unit" name="unit" class="form-select">
+                            <option value="pcs">pcs</option>
+                            <option value="cup">cup</option>
+                            <option value="pack">pack</option>
+                            <option value="bottle">bottle</option>
+                            <option value="can">can</option>
+                            <option value="tsp">tsp</option>
+                            <option value="kg">kg</option>
+                            <option value="g">g</option>
+                            <option value="ml">ml</option>
+                        </select>
+                    </div>
 
-                <div class="form-group form-actions">
-                    <button type="submit" class="btn btn-primary">Add Part</button>
-                </div>
-            </form>
-        </div>
+                    <div class="form-group form-actions">
+                        <button type="submit" class="btn btn-primary">Add Part</button>
+                    </div>
+                </form>
+            </div>
+        </details>
 
         <!-- Per-part hidden forms (HTML5 form attribute pattern, same as products) -->
         <?php foreach ($parts_all as $part): ?>
