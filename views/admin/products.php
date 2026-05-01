@@ -228,56 +228,25 @@
                                 </td>
                             </tr>
 
-                            <!-- Hidden recipe editor row -->
-                            <tr id="recipe-<?= $pid ?>" class="recipe-row" style="display:none;">
-                                <td colspan="9">
-                                    <div class="recipe-panel">
-                                        <h4>Recipe for <?= htmlspecialchars($product['Name']) ?></h4>
-                                        <p class="text-muted" style="margin:0 0 8px 0;">
-                                            Tick the parts needed to make <strong>1 unit</strong> of this product.
-                                            The quantity is per single unit (e.g. Lumpia Bowl = 4 Lumpia + 1 Rice + 1 Rice Cup).
-                                        </p>
-                                        <form method="POST" action="<?= BASE_URL ?>/admin/parts/save-recipe">
-                                            <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                                            <input type="hidden" name="product_id" value="<?= $pid ?>">
-
-                                            <div class="recipe-parts-list">
-                                                <?php foreach ($all_parts as $part): ?>
-                                                    <?php $cur = $partsHere[(int) $part['Part_ID']] ?? 0; ?>
-                                                    <div class="recipe-part-row">
-                                                        <label class="recipe-part-label">
-                                                            <input type="checkbox"
-                                                                   name="part_ids[]"
-                                                                   value="<?= $part['Part_ID'] ?>"
-                                                                   <?= $cur > 0 ? 'checked' : '' ?>>
-                                                            <span><?= htmlspecialchars($part['Name']) ?>
-                                                                <small class="text-muted">(<?= htmlspecialchars($part['Unit']) ?>)</small>
-                                                            </span>
-                                                        </label>
-                                                        <input type="number"
-                                                               name="quantities[]"
-                                                               class="form-input recipe-qty"
-                                                               value="<?= max(1, $cur) ?>"
-                                                               min="1" max="99"
-                                                               <?= $cur > 0 ? '' : 'disabled' ?>>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
-
-                                            <div class="recipe-actions">
-                                                <button type="submit" class="btn btn-primary">Save Recipe</button>
-                                                <button type="button" class="btn btn-outline"
-                                                        onclick="toggleRecipe(<?= $pid ?>)">Cancel</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </td>
+                            <!-- Hidden recipe editor row — empty placeholder; panel HTML is injected on click -->
+                            <tr id="recipe-<?= $pid ?>" class="recipe-row" data-product-id="<?= $pid ?>"
+                                data-product-name="<?= htmlspecialchars($product['Name']) ?>"
+                                style="display:none;">
+                                <td colspan="9"><!-- panel injected by JS --></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+
+        <!-- Shared parts list + per-product recipe data — used to inject panels on demand -->
+        <script id="recipeAllParts" type="application/json"><?= json_encode(array_map(function($p) {
+            return ['id' => (int) $p['Part_ID'], 'name' => $p['Name'], 'unit' => $p['Unit']];
+        }, $all_parts)) ?></script>
+        <script id="recipeMap" type="application/json"><?= json_encode($recipe_map) ?></script>
+        <input type="hidden" id="recipeCsrf" value="<?= Auth::generateCsrf() ?>">
+        <input type="hidden" id="recipeBaseUrl" value="<?= BASE_URL ?>">
 
         <!-- Pagination -->
         <div class="pagination" id="productsPagination" style="display:none;">
@@ -436,12 +405,68 @@
         });
     });
 
-    // ===== RECIPE TOGGLE =====
+    // ===== RECIPE LAZY-INJECT + TOGGLE =====
+    // The recipe panel HTML used to be pre-rendered for every product (heavy).
+    // Now we render it only when the user clicks Edit Recipe.
+    const allPartsData = JSON.parse(document.getElementById('recipeAllParts').textContent || '[]');
+    const recipeMap    = JSON.parse(document.getElementById('recipeMap').textContent || '{}');
+    const csrfToken    = document.getElementById('recipeCsrf').value;
+    const baseUrl      = document.getElementById('recipeBaseUrl').value;
+
+    function buildRecipePanel(pid, productName) {
+        const recipe = recipeMap[pid] || {};
+        const partsHtml = allPartsData.map(function (p) {
+            const cur = parseInt(recipe[p.id] || 0, 10);
+            const checked  = cur > 0 ? 'checked' : '';
+            const disabled = cur > 0 ? '' : 'disabled';
+            return '<div class="recipe-part-row">'
+                +    '<label class="recipe-part-label">'
+                +      '<input type="checkbox" name="part_ids[]" value="' + p.id + '" ' + checked + '>'
+                +      '<span>' + escapeHtml(p.name) + ' <small class="text-muted">(' + escapeHtml(p.unit) + ')</small></span>'
+                +    '</label>'
+                +    '<input type="number" name="quantities[]" class="form-input recipe-qty" '
+                +         'value="' + Math.max(1, cur) + '" min="1" max="99" ' + disabled + '>'
+                +  '</div>';
+        }).join('');
+
+        return ''
+            + '<div class="recipe-panel">'
+            +   '<h4>Recipe for ' + escapeHtml(productName) + '</h4>'
+            +   '<p class="text-muted" style="margin:0 0 8px 0;">'
+            +     'Tick the parts needed to make <strong>1 unit</strong> of this product. '
+            +     'The quantity is per single unit (e.g. Lumpia Bowl = 4 Lumpia + 1 Rice + 1 Rice Cup).'
+            +   '</p>'
+            +   '<form method="POST" action="' + baseUrl + '/admin/parts/save-recipe">'
+            +     '<input type="hidden" name="csrf_token" value="' + csrfToken + '">'
+            +     '<input type="hidden" name="product_id" value="' + pid + '">'
+            +     '<div class="recipe-parts-list">' + partsHtml + '</div>'
+            +     '<div class="recipe-actions">'
+            +       '<button type="submit" class="btn btn-primary">Save Recipe</button>'
+            +       '<button type="button" class="btn btn-outline" onclick="toggleRecipe(' + pid + ')">Cancel</button>'
+            +     '</div>'
+            +   '</form>'
+            + '</div>';
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
     window.toggleRecipe = function (pid) {
         const row = document.getElementById('recipe-' + pid);
         if (!row) return;
         const willOpen = (row.style.display === 'none' || row.style.display === '');
-        row.style.display = willOpen ? 'table-row' : 'none';
+        if (willOpen) {
+            const td = row.querySelector('td');
+            // Inject only the first time it's opened
+            if (td && !td.dataset.loaded) {
+                td.innerHTML  = buildRecipePanel(pid, row.dataset.productName);
+                td.dataset.loaded = '1';
+            }
+            row.style.display = 'table-row';
+        } else {
+            row.style.display = 'none';
+        }
     };
 
     // Sync recipe checkbox -> qty input enable/disable
