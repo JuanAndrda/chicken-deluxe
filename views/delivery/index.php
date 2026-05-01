@@ -229,18 +229,14 @@
                     <input type="hidden" name="date"       value="<?= $date ?>">
                     <div class="pullout-fields">
                         <div class="form-group" style="flex:1 1 200px;">
-                            <label for="pulloutProduct">Product</label>
-                            <select id="pulloutProduct" name="product_id" class="form-select" required>
-                                <option value="">— Select product —</option>
-                                <?php foreach ($products as $category => $items): ?>
-                                    <optgroup label="<?= htmlspecialchars($category) ?>">
-                                        <?php foreach ($items as $p): ?>
-                                            <option value="<?= $p['Product_ID'] ?>">
-                                                <?= htmlspecialchars($p['Name']) ?>
-                                                (<?= htmlspecialchars($p['Unit']) ?>)
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </optgroup>
+                            <label for="pulloutPart">Part</label>
+                            <select id="pulloutPart" name="part_id" class="form-select" required>
+                                <option value="">— Select part —</option>
+                                <?php foreach ($parts as $p): ?>
+                                    <option value="<?= $p['Part_ID'] ?>">
+                                        <?= htmlspecialchars($p['Name']) ?>
+                                        (<?= htmlspecialchars($p['Unit']) ?>)
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

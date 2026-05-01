@@ -229,6 +229,8 @@ class DeliveryController extends Controller
         }
 
         $kiosk_id   = $this->resolveKiosk();
+        // Prefer part_id (new parts-based path); fall back to product_id for legacy support
+        $part_id    = (int) $this->post('part_id');
         $product_id = (int) $this->post('product_id');
         $quantity   = (int) $this->post('quantity');
         $notes      = trim($this->post('notes', ''));
@@ -239,13 +241,19 @@ class DeliveryController extends Controller
             return;
         }
 
-        if ($product_id <= 0 || $quantity <= 0) {
-            $this->redirect("/delivery?date={$date}&error=Product+and+quantity+are+required");
+        if (($part_id <= 0 && $product_id <= 0) || $quantity <= 0) {
+            $this->redirect("/delivery?date={$date}&error=Item+and+quantity+are+required");
             return;
         }
 
-        $delivery_id = $this->deliveryModel->createPullout($kiosk_id, Auth::userId(), $product_id, $date, $quantity, $notes);
-        $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Pullout ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
+        if ($part_id > 0) {
+            $delivery_id = $this->deliveryModel->createPartPullout($kiosk_id, Auth::userId(), $part_id, $date, $quantity, $notes);
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Pullout ID:{$delivery_id} — part:{$part_id}, qty:{$quantity}");
+        } else {
+            // Legacy product-based pullout path — preserved
+            $delivery_id = $this->deliveryModel->createPullout($kiosk_id, Auth::userId(), $product_id, $date, $quantity, $notes);
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Pullout ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
+        }
 
         $this->redirect("/delivery?date={$date}&kiosk_id={$kiosk_id}&success=Pullout+recorded");
     }

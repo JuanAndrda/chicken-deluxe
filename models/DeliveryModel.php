@@ -111,6 +111,16 @@ class DeliveryModel extends Model
         );
     }
 
+    /** Create a parts pullout record (stock removed — Type='Pullout') */
+    public function createPartPullout(int $kiosk_id, int $user_id, int $part_id, string $date, int $quantity, string $notes = ''): int
+    {
+        return $this->db->insert(
+            "INSERT INTO Delivery (Kiosk_ID, User_ID, Part_ID, Delivery_Date, Quantity, Type, Notes)
+             VALUES (?, ?, ?, ?, ?, 'Pullout', ?)",
+            [$kiosk_id, $user_id, $part_id, $date, $quantity, $notes]
+        );
+    }
+
     /**
      * Get parts deliveries for a date and kiosk.
      * Filters out historical product-based rows (Part_ID NULL).
