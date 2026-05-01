@@ -102,6 +102,9 @@
                                     $avail      = (!$is_today || $avail_info === null)
                                                 ? 1            // no inventory recorded yet → don't block
                                                 : ($avail_info['available'] ? 1 : 0);
+                                    $max_qty    = (!$is_today || $avail_info === null)
+                                                ? 9999
+                                                : (int) ($avail_info['max'] ?? 0);
 
                                     // Build short list of missing parts for the tooltip
                                     $missing_parts = [];
@@ -125,6 +128,7 @@
                                         data-img="<?= htmlspecialchars($imgUrl) ?>"
                                         data-category="<?= htmlspecialchars($category) ?>"
                                         data-available="<?= $avail ?>"
+                                        data-max="<?= $max_qty ?>"
                                         <?= $tooltip ? 'title="Missing parts: ' . htmlspecialchars($tooltip) . '"' : '' ?>>
                                     <img class="pos-product-img"
                                          src="<?= htmlspecialchars($imgUrl) ?>"
@@ -140,11 +144,11 @@
                                         <?php if (!$avail): ?>
                                             <span class="pos-stock-badge pos-stock-none"
                                                   title="<?= htmlspecialchars($tooltip) ?>">
-                                                Parts Low
+                                                Out of Stock
                                             </span>
                                         <?php else: ?>
                                             <span class="pos-stock-badge pos-stock-ok">
-                                                Available
+                                                Available: <?= $max_qty ?>
                                             </span>
                                         <?php endif; ?>
                                     <?php endif; ?>
@@ -396,6 +400,22 @@
         });
     });
 
+    // ============ POS TOAST (transient warning banner) ============
+    let posToastTimer = null;
+    function showPosToast(msg, kind) {
+        let toast = document.getElementById('posToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'posToast';
+            toast.className = 'pos-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.className = 'pos-toast pos-toast-' + (kind || 'warn') + ' is-visible';
+        clearTimeout(posToastTimer);
+        posToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2800);
+    }
+
     // ============ PRODUCT CLICK -> ADD TO CART ============
     if (grid) {
         grid.addEventListener('click', function (e) {
@@ -405,10 +425,20 @@
             if (card.dataset.available === '0') {
                 card.classList.add('card-shake');
                 setTimeout(() => card.classList.remove('card-shake'), 400);
+                showPosToast('Out of stock — not enough parts to make this product');
                 return;
             }
-            const id = card.dataset.id;
-            const p  = productMap[id];
+            // Block if cart already at max for this product
+            const id  = card.dataset.id;
+            const max = parseInt(card.dataset.max || '9999', 10);
+            const cur = cart[id] ? cart[id].qty : 0;
+            if (cur >= max) {
+                card.classList.add('card-shake');
+                setTimeout(() => card.classList.remove('card-shake'), 400);
+                showPosToast('Only ' + max + ' ' + card.dataset.name + ' available — cart already has ' + cur);
+                return;
+            }
+            const p = productMap[id];
             if (!p) return;
             addToCart(id, p);
 
@@ -441,6 +471,14 @@
     function updateQty(id, newQty) {
         newQty = parseInt(newQty) || 0;
         if (newQty <= 0) { removeFromCart(id); return; }
+        // Clamp to per-product max from data-max on the card
+        const card = document.querySelector('.pos-product-card[data-id="' + id + '"]');
+        const max  = card ? parseInt(card.dataset.max || '9999', 10) : 9999;
+        if (newQty > max) {
+            const name = (cart[id] && cart[id].name) || 'this product';
+            showPosToast('Only ' + max + ' ' + name + ' available right now');
+            newQty = max;
+        }
         if (cart[id]) cart[id].qty = newQty;
         renderCart();
         updateBadges();

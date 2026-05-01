@@ -3024,3 +3024,31 @@ tr:hover {
 
 /* Running inventory: pullout amount (orange — matches Type='Pullout' badge color) */
 .running-pullout { color: #E65100; font-weight: 700; }
+
+/* ================================================================
+   POS — toast banner for stock-limit warnings (transient bottom-right)
+   ================================================================ */
+.pos-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 9999;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 6px 22px rgba(0,0,0,.18);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .18s, transform .18s;
+    pointer-events: none;
+    max-width: 360px;
+}
+.pos-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.pos-toast-warn { background: #E65100; }
+.pos-toast-err  { background: #C62828; }
+.pos-toast-ok   { background: #2E7D32; }

@@ -57,17 +57,21 @@ class SalesController extends Controller
                 $recipe = $p['Recipe'] ?? [];
                 if (empty($recipe)) {
                     // No recipe defined → treat as unlimited (don't block sales)
-                    $availability_map[$pid] = ['available' => true, 'parts' => []];
+                    $availability_map[$pid] = ['available' => true, 'max' => 9999, 'parts' => []];
                     continue;
                 }
-                $ok_overall = true;
-                $parts_info = [];
+                $ok_overall    = true;
+                $parts_info    = [];
+                $max_buildable = PHP_INT_MAX;
                 foreach ($recipe as $r) {
                     $part_id = (int) $r['Part_ID'];
                     $needed  = (int) $r['Quantity_needed'];
                     $have    = $stock_by_part[$part_id] ?? 0;
                     $ok      = $have >= $needed;
                     if (!$ok) $ok_overall = false;
+                    // How many full units can this part alone support?
+                    $cap_from_part = $needed > 0 ? intdiv($have, $needed) : PHP_INT_MAX;
+                    if ($cap_from_part < $max_buildable) $max_buildable = $cap_from_part;
                     $parts_info[] = [
                         'name'      => $r['Part_Name'],
                         'needed'    => $needed,
@@ -75,7 +79,12 @@ class SalesController extends Controller
                         'ok'        => $ok,
                     ];
                 }
-                $availability_map[$pid] = ['available' => $ok_overall, 'parts' => $parts_info];
+                if ($max_buildable === PHP_INT_MAX) $max_buildable = 0;
+                $availability_map[$pid] = [
+                    'available' => $ok_overall,
+                    'max'       => max(0, $max_buildable),
+                    'parts'     => $parts_info,
+                ];
             }
         }
 
@@ -189,6 +198,45 @@ class SalesController extends Controller
         if (empty($items)) {
             $this->redirect("/sales?date={$date}&error=No+valid+products+in+order");
             return;
+        }
+
+        // ----- Cumulative parts-availability check (defense in depth) -----
+        // Aggregate parts needed across the WHOLE cart (handles cases like
+        // "3 burgers + 5 cheeseburgers" both consuming the bun pool).
+        if ($date === date('Y-m-d')) {
+            $running = $this->inventoryModel->getRunningPartsInventory($date, $kiosk_id);
+            $stock_by_part = [];
+            $part_names    = [];
+            foreach ($running as $r) {
+                $stock_by_part[(int) $r['Part_ID']] = (int) $r['Running_Qty'];
+                $part_names[(int) $r['Part_ID']]    = $r['Part_Name'];
+            }
+
+            $total_parts_needed = [];
+            foreach ($items as $item) {
+                $recipe = $this->productModel->getRecipe($item['product_id']);
+                foreach ($recipe as $r) {
+                    $part_id = (int) $r['Part_ID'];
+                    $part_names[$part_id] = $part_names[$part_id] ?? $r['Part_Name'];
+                    $total_parts_needed[$part_id] =
+                        ($total_parts_needed[$part_id] ?? 0)
+                        + (int) $r['Quantity_needed'] * (int) $item['quantity_sold'];
+                }
+            }
+
+            $shortages = [];
+            foreach ($total_parts_needed as $part_id => $needed) {
+                $have = $stock_by_part[$part_id] ?? 0;
+                if ($have < $needed) {
+                    $shortages[] = ($part_names[$part_id] ?? "Part#{$part_id}")
+                        . " (need {$needed}, have {$have})";
+                }
+            }
+            if (!empty($shortages)) {
+                $msg = 'Cannot complete order — not enough parts: ' . implode('; ', $shortages);
+                $this->redirect("/sales?date={$date}&kiosk_id={$kiosk_id}&error=" . urlencode($msg));
+                return;
+            }
         }
 
         try {
