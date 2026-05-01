@@ -2989,3 +2989,35 @@ tr:hover {
 .add-form-card {
     margin-top: 12px;
 }
+
+/* ================================================================
+   Add-product form — inline recipe section (collapsible)
+   ================================================================ */
+.add-recipe-details {
+    margin-top: 14px;
+    border-top: 1px dashed #E0E0E0;
+    padding-top: 12px;
+}
+.add-recipe-summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: #555;
+    padding: 6px 0;
+    list-style: none;
+    user-select: none;
+}
+.add-recipe-summary::-webkit-details-marker { display: none; }
+.add-recipe-summary:hover { color: var(--primary, #E63946); }
+.add-recipe-summary .text-muted { font-weight: 400; font-size: 12px; }
+
+.add-recipe-details[open] > .add-recipe-summary::before { content: '▾ '; }
+.add-recipe-details:not([open]) > .add-recipe-summary::before { content: '▸ '; }
+
+.add-recipe-body {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #FAFCFF;
+    border: 1px solid #E5EAF0;
+    border-radius: 8px;
+}

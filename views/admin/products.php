@@ -52,42 +52,73 @@
             </summary>
             <div class="card form-card add-form-card">
                 <form method="POST" action="<?= BASE_URL ?>/admin/products/create"
-                      class="form-inline-grid" enctype="multipart/form-data">
+                      enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
 
-                    <div class="form-group">
-                        <label for="name">Product Name</label>
-                        <input type="text" id="name" name="name" class="form-input" required>
+                    <!-- Basic fields -->
+                    <div class="form-inline-grid">
+                        <div class="form-group">
+                            <label for="name">Product Name</label>
+                            <input type="text" id="name" name="name" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category_id">Category</label>
+                            <select id="category_id" name="category_id" class="form-select" required>
+                                <option value="">Select Category</option>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?= $cat['Category_ID'] ?>"><?= htmlspecialchars($cat['Name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="unit">Unit</label>
+                            <input type="text" id="unit" name="unit" class="form-input" value="pcs" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="price">Price (P)</label>
+                            <input type="number" id="price" name="price" class="form-input" min="0" step="0.01" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="photo">Photo (optional)</label>
+                            <input type="file" id="photo" name="photo" class="form-input"
+                                   accept="image/jpeg,image/png,image/webp">
+                            <small class="form-hint">JPG, PNG, or WEBP. Max 2MB.</small>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="category_id">Category</label>
-                        <select id="category_id" name="category_id" class="form-select" required>
-                            <option value="">Select Category</option>
-                            <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['Category_ID'] ?>"><?= htmlspecialchars($cat['Name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <!-- Recipe section (optional — sets parts the product is built from) -->
+                    <details class="add-recipe-details">
+                        <summary class="add-recipe-summary">
+                            🧩 Recipe — pick the parts that make 1 unit of this product
+                            <span class="text-muted">(optional · you can also edit it later)</span>
+                        </summary>
+                        <div class="add-recipe-body">
+                            <p class="text-muted" style="margin:0 0 8px 0;font-size:13px;">
+                                Tick a part to include it · the quantity is per <strong>1 unit</strong> of the product
+                                (e.g. Lumpia Bowl = 4 Lumpia + 1 Rice + 1 Rice Cup).
+                            </p>
+                            <div class="recipe-parts-list">
+                                <?php foreach ($all_parts as $part): ?>
+                                    <div class="recipe-part-row">
+                                        <label class="recipe-part-label">
+                                            <input type="checkbox" name="part_ids[]" value="<?= $part['Part_ID'] ?>">
+                                            <span><?= htmlspecialchars($part['Name']) ?>
+                                                <small class="text-muted">(<?= htmlspecialchars($part['Unit']) ?>)</small>
+                                            </span>
+                                        </label>
+                                        <input type="number" name="quantities[]" class="form-input recipe-qty"
+                                               value="1" min="1" max="99" disabled>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </details>
 
-                    <div class="form-group">
-                        <label for="unit">Unit</label>
-                        <input type="text" id="unit" name="unit" class="form-input" value="pcs" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="price">Price (P)</label>
-                        <input type="number" id="price" name="price" class="form-input" min="0" step="0.01" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="photo">Photo (optional)</label>
-                        <input type="file" id="photo" name="photo" class="form-input"
-                               accept="image/jpeg,image/png,image/webp">
-                        <small class="form-hint">JPG, PNG, or WEBP. Max 2MB.</small>
-                    </div>
-
-                    <div class="form-group form-actions">
+                    <div class="form-actions" style="margin-top:14px;">
                         <button type="submit" class="btn btn-primary">Add Product</button>
                     </div>
                 </form>

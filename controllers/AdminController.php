@@ -331,6 +331,32 @@ class AdminController extends Controller
         $product_id = $this->productModel->create($category_id, $name, $unit, $price);
         $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Created product: {$name} (ID:{$product_id})");
 
+        // Optional recipe (parts) — same parallel-arrays format as saveRecipe()
+        $part_ids   = $this->post('part_ids', []);
+        $quantities = $this->post('quantities', []);
+        if (is_array($part_ids) && !empty($part_ids)) {
+            $items = [];
+            foreach ($part_ids as $idx => $pid) {
+                $qty = (int) ($quantities[$idx] ?? 0);
+                if ($qty <= 0) continue;
+                $items[] = ['part_id' => (int) $pid, 'quantity_needed' => $qty];
+            }
+            if (!empty($items)) {
+                try {
+                    $this->productModel->setRecipe($product_id, $items);
+                    $this->auditLog->log(Auth::userId(), ACTION_UPDATE,
+                        "Saved initial recipe for Product ID:{$product_id} (" . count($items) . " parts)");
+                } catch (\Exception $e) {
+                    // Product created OK but recipe save failed — surface the issue but don't lose the product
+                    $this->redirect('/admin/products?error=' . urlencode(
+                        "Product '{$name}' added, but recipe could not be saved: " . $e->getMessage()
+                        . ". Click Edit Recipe on the product row to set it manually."
+                    ));
+                    return;
+                }
+            }
+        }
+
         // Optional photo upload
         $photoError = $this->handlePhotoUpload($name, 'photo');
         if ($photoError !== null) {
