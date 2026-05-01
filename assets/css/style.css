@@ -2830,3 +2830,111 @@ tr:hover {
 .hours-normal   { color: #2E7D32; font-weight: 700; }
 .hours-warning  { color: #E65100; font-weight: 700; }
 .hours-overtime { color: #6A1A9A; font-weight: 700; }
+
+/* ================================================================
+   STEP 3 — Admin Products & Parts unified page
+   ================================================================ */
+
+/* Top-level tab nav (Products vs Parts) */
+.admin-products-tab-nav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid #E0E0E0;
+    margin-bottom: 20px;
+}
+.admin-products-tab-btn {
+    padding: 10px 22px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #777;
+    cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+    border-radius: 4px 4px 0 0;
+}
+.admin-products-tab-btn:hover  { color: var(--primary); }
+.admin-products-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: #F5F8FF;
+}
+.admin-products-tab-panel { display: none; }
+.admin-products-tab-panel.active { display: block; }
+
+/* Recipe editor panel (collapsible row inside products table) */
+.recipe-panel {
+    padding: 18px 20px;
+    background: #F8F9FA;
+    border-radius: 8px;
+    border-left: 3px solid var(--primary);
+    margin: 4px 0;
+}
+.recipe-panel h4 {
+    margin: 0 0 4px 0;
+    font-size: 15px;
+    color: #333;
+}
+.recipe-parts-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+}
+.recipe-part-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    transition: background .12s, border-color .12s;
+}
+.recipe-part-row:hover { background: #FAFCFF; border-color: #D0DEFF; }
+.recipe-part-label {
+    flex: 1;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin: 0;
+}
+.recipe-part-label small { font-size: 11px; color: #999; margin-left: 4px; }
+.recipe-qty {
+    width: 56px !important;
+    text-align: center;
+    padding: 4px !important;
+}
+.recipe-qty:disabled { opacity: 0.4; }
+.recipe-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid #E5E5E5;
+}
+
+/* ================================================================
+   STEPS 5 & 6 — Parts-based deliveries + POS availability tooltip
+   ================================================================ */
+.recipe-row td { background: #EEF4FF; }
+
+/* POS stock badge tooltip cursor */
+.pos-stock-badge[title] { cursor: help; }
+.pos-product-card[title] { cursor: pointer; }
+
+/* Parts-row styling in delivery records / select tables */
+.parts-row { font-size: 13px; }
+.delivery-parts-badge {
+    background: #E3F2FD;
+    color: #1565C0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}

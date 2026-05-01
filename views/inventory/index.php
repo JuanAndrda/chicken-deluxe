@@ -5,8 +5,7 @@
        Step-tab layout: visibility + auto-focus
        ============================================================ */
     // Running widget renders only when these conditions hold (preserved
-    // from the original inline gate). The Running tab button is hidden
-    // when this is false.
+    // from the original implementation). Running tab is hidden when false.
     $has_running = $has_beginning && !$has_ending && !empty($running_inventory ?? []);
 
     // Pick which tab to open on page load
@@ -28,6 +27,8 @@
             if ($q <= 5) $running_warn_count++;
         }
     }
+
+    $total_parts = count($parts ?? []);
 ?>
 <section class="inventory">
     <div class="section-header">
@@ -99,7 +100,6 @@
 
     <!-- ============================================================
          STEP-TAB WRAPPER — Beginning / Running / Ending
-         Same tab pattern used on Sales and Delivery pages.
          ============================================================ -->
     <div class="card inventory-step-wrapper">
 
@@ -146,7 +146,7 @@
             </button>
         </div>
 
-        <!-- Mini status strip — at-a-glance state of all 3 steps -->
+        <!-- Mini status strip -->
         <div class="inventory-step-status">
             <span class="step-status-item">
                 <strong>Beginning:</strong>
@@ -190,70 +190,46 @@
              id="step-beginning" role="tabpanel">
 
         <?php if ($has_beginning): ?>
-            <?php
-                // Group saved rows by category to mirror the entry-form tab layout
-                $beginning_grouped = [];
-                foreach ($beginning as $row) {
-                    $beginning_grouped[$row['Category_Name']][] = $row;
-                }
-            ?>
-            <div class="inventory-saved-view">
-                <div class="inventory-tabs" role="tablist">
-                    <?php $first = true; foreach ($beginning_grouped as $category => $items): ?>
-                        <button type="button"
-                                class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                data-category="<?= htmlspecialchars($category) ?>"
-                                role="tab">
-                            <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                            <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                        </button>
-                    <?php $first = false; endforeach; ?>
-                </div>
-
-                <?php $first = true; foreach ($beginning_grouped as $category => $items): ?>
-                    <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                         data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                        <?php foreach ($items as $row): ?>
-                            <?php $show_locked = $staff_locked || $row['Locked_status']; ?>
-                            <div class="inventory-product-row">
-                                <div class="inventory-product-name"><?= htmlspecialchars($row['Product_Name']) ?></div>
-                                <div class="inventory-product-unit"><?= htmlspecialchars($row['Unit']) ?></div>
-                                <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
-                                <div class="inventory-saved-status">
-                                    <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
-                                        <?= $show_locked ? 'Locked' : 'Open' ?>
-                                    </span>
-                                </div>
-                                <?php if (Auth::isOwner()): ?>
-                                    <div class="inventory-saved-action">
-                                        <?php if ($row['Locked_status']): ?>
-                                            <form method="POST" action="<?= BASE_URL ?>/inventory/unlock" class="inline-form">
-                                                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                                                <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
-                                                <input type="hidden" name="date" value="<?= $date ?>">
-                                                <button type="button" class="btn btn-sm btn-outline"
-                                                        onclick="showConfirmModal({
-                                                            title: 'Unlock Record',
-                                                            message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
-                                                            confirmText: 'Yes, Unlock',
-                                                            type: 'unlock',
-                                                            onConfirm: () => this.closest('form').submit()
-                                                        })">Unlock</button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="text-light">&mdash;</span>
-                                        <?php endif; ?>
-                                    </div>
+            <!-- Saved view: flat parts list -->
+            <div class="inventory-saved-view inventory-flat">
+                <h4 class="inventory-flat-heading">All Parts (<?= count($beginning) ?>)</h4>
+                <?php foreach ($beginning as $row): ?>
+                    <?php $show_locked = $staff_locked || $row['Locked_status']; ?>
+                    <div class="inventory-product-row">
+                        <div class="inventory-product-name"><?= htmlspecialchars($row['Part_Name']) ?></div>
+                        <div class="inventory-product-unit"><?= htmlspecialchars($row['Unit']) ?></div>
+                        <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
+                        <div class="inventory-saved-status">
+                            <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
+                                <?= $show_locked ? 'Locked' : 'Open' ?>
+                            </span>
+                        </div>
+                        <?php if (Auth::isOwner()): ?>
+                            <div class="inventory-saved-action">
+                                <?php if ($row['Locked_status']): ?>
+                                    <form method="POST" action="<?= BASE_URL ?>/inventory/unlock" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                        <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                        <input type="hidden" name="date" value="<?= $date ?>">
+                                        <button type="button" class="btn btn-sm btn-outline"
+                                                onclick="showConfirmModal({
+                                                    title: 'Unlock Record',
+                                                    message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
+                                                    confirmText: 'Yes, Unlock',
+                                                    type: 'unlock',
+                                                    onConfirm: () => this.closest('form').submit()
+                                                })">Unlock</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-light">&mdash;</span>
                                 <?php endif; ?>
                             </div>
-                        <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
-                <?php $first = false; endforeach; ?>
+                <?php endforeach; ?>
             </div>
         <?php elseif ($is_today): ?>
-            <!-- ============================================================
-                 Perpetual inventory: Option A = auto-generate, Option B = manual
-                 ============================================================ -->
+            <!-- Perpetual: Option A = auto-generate / Option B = manual -->
             <?php if ($has_previous_ending): ?>
                 <div class="perpetual-option perpetual-option-a">
                     <div class="perpetual-option-header">
@@ -265,13 +241,13 @@
                         You can edit any quantity afterwards if a physical recount is needed.
                     </p>
 
-                    <!-- Preview: top 5 products from previous ending -->
+                    <!-- Preview: top 5 parts from previous ending -->
                     <div class="perpetual-preview">
                         <div class="perpetual-preview-title">Preview (top 5 of <?= count($previous_ending) ?>):</div>
                         <ul class="perpetual-preview-list">
                             <?php foreach (array_slice($previous_ending, 0, 5) as $prev): ?>
                                 <li>
-                                    <span class="perpetual-preview-name"><?= htmlspecialchars($prev['Product_Name']) ?></span>
+                                    <span class="perpetual-preview-name"><?= htmlspecialchars($prev['Part_Name']) ?></span>
                                     <span class="perpetual-preview-qty"><?= (int) $prev['Quantity'] ?> <?= htmlspecialchars($prev['Unit']) ?></span>
                                 </li>
                             <?php endforeach; ?>
@@ -307,11 +283,10 @@
                 </div>
             <?php endif; ?>
 
-            <!-- Beginning Stock Form (tab layout) — manual / Option B -->
-            <?php $total_products = array_sum(array_map('count', $products)); ?>
+            <!-- Beginning Stock Form — manual / Option B  (FLAT parts list) -->
             <div id="manual-beginning-form" class="perpetual-manual-form<?= !$has_previous_ending ? ' is-open' : '' ?>">
             <form method="POST" action="<?= BASE_URL ?>/inventory/store"
-                  class="inventory-entry-form" data-total="<?= $total_products ?>"
+                  class="inventory-entry-form" data-total="<?= $total_parts ?>"
                   data-label="Save Beginning Stock">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                 <input type="hidden" name="snapshot_type" value="beginning">
@@ -319,43 +294,29 @@
                 <input type="hidden" name="date" value="<?= $date ?>">
 
                 <div class="inventory-progress-label">
-                    <span class="inventory-filled-count">0</span> of <?= $total_products ?> products filled
+                    <span class="inventory-filled-count">0</span> of <?= $total_parts ?> parts filled
                 </div>
                 <div class="inventory-progress">
                     <div class="inventory-progress-bar" style="width:0%"></div>
                 </div>
 
-                <div class="inventory-tabs" role="tablist">
-                    <?php $first = true; foreach ($products as $category => $items): ?>
-                        <button type="button"
-                                class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                data-category="<?= htmlspecialchars($category) ?>"
-                                role="tab">
-                            <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                            <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                        </button>
-                    <?php $first = false; endforeach; ?>
-                </div>
-
-                <?php $first = true; foreach ($products as $category => $items): ?>
-                    <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                         data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                        <?php foreach ($items as $product): ?>
-                            <div class="inventory-product-row">
-                                <div class="inventory-product-name"><?= htmlspecialchars($product['Name']) ?></div>
-                                <div class="inventory-product-unit"><?= htmlspecialchars($product['Unit']) ?></div>
-                                <div class="inventory-qty-control">
-                                    <button type="button" class="inventory-qty-btn" data-action="dec" aria-label="Decrease">&minus;</button>
-                                    <input type="number"
-                                           name="qty[<?= $product['Product_ID'] ?>]"
-                                           class="inventory-qty-input"
-                                           min="0" value="0" required>
-                                    <button type="button" class="inventory-qty-btn" data-action="inc" aria-label="Increase">+</button>
-                                </div>
+                <div class="inventory-flat">
+                    <h4 class="inventory-flat-heading">All Parts (<?= $total_parts ?>)</h4>
+                    <?php foreach ($parts as $part): ?>
+                        <div class="inventory-product-row">
+                            <div class="inventory-product-name"><?= htmlspecialchars($part['Name']) ?></div>
+                            <div class="inventory-product-unit"><?= htmlspecialchars($part['Unit']) ?></div>
+                            <div class="inventory-qty-control">
+                                <button type="button" class="inventory-qty-btn" data-action="dec" aria-label="Decrease">&minus;</button>
+                                <input type="number"
+                                       name="qty[<?= $part['Part_ID'] ?>]"
+                                       class="inventory-qty-input"
+                                       min="0" value="0" required>
+                                <button type="button" class="inventory-qty-btn" data-action="inc" aria-label="Increase">+</button>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php $first = false; endforeach; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
 
                 <div class="inventory-sticky-submit">
                     <button type="button" class="btn btn-primary inventory-submit-btn"
@@ -366,7 +327,7 @@
                                 type: 'submit',
                                 onConfirm: () => this.closest('form').submit()
                             })">
-                        Save Beginning Stock (<span class="inventory-filled-count">0</span> of <?= $total_products ?> filled)
+                        Save Beginning Stock (<span class="inventory-filled-count">0</span> of <?= $total_parts ?> filled)
                     </button>
                 </div>
             </form>
@@ -380,14 +341,10 @@
         <!-- ====================== STEP 2: RUNNING ====================== -->
         <?php if ($has_running): ?>
             <?php
-                $running_grouped = [];
-                foreach ($running_inventory as $r) {
-                    $running_grouped[$r['Category_Name']][] = $r;
-                }
                 $low_count = 0; $zero_count = 0; $neg_count = 0;
                 foreach ($running_inventory as $r) {
                     $q = (int) $r['Running_Qty'];
-                    if ($q < 0)      $neg_count++;
+                    if ($q < 0)       $neg_count++;
                     elseif ($q === 0) $zero_count++;
                     elseif ($q <= 5)  $low_count++;
                 }
@@ -397,7 +354,7 @@
 
                 <div class="running-inventory-header">
                     <p class="text-light running-inventory-formula" style="margin:0;">
-                        Beginning + Delivered &minus; Sold = Running stock
+                        Beginning + Delivered &minus; Used by sales = Running stock
                     </p>
                     <div class="running-inventory-stats">
                         <span class="running-stat running-stat-neg" title="Negative — sold more than available">&#9888; <?= $neg_count ?></span>
@@ -406,46 +363,30 @@
                     </div>
                 </div>
 
-                <div class="inventory-saved-view">
-                    <div class="inventory-tabs" role="tablist">
-                        <?php $first = true; foreach ($running_grouped as $category => $items): ?>
-                            <button type="button"
-                                    class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                    data-category="<?= htmlspecialchars($category) ?>"
-                                    role="tab">
-                                <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                                <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                            </button>
-                        <?php $first = false; endforeach; ?>
-                    </div>
-
-                    <?php $first = true; foreach ($running_grouped as $category => $items): ?>
-                        <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                             data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                            <?php foreach ($items as $r): ?>
-                                <?php
-                                    $q = (int) $r['Running_Qty'];
-                                    $row_class = '';
-                                    if ($q < 0)       $row_class = 'running-row-negative';
-                                    elseif ($q === 0) $row_class = 'running-row-zero';
-                                    elseif ($q <= 5)  $row_class = 'running-row-low';
-                                ?>
-                                <div class="inventory-product-row running-product-row <?= $row_class ?>">
-                                    <div class="inventory-product-name"><?= htmlspecialchars($r['Product_Name']) ?></div>
-                                    <div class="inventory-product-unit"><?= htmlspecialchars($r['Unit']) ?></div>
-                                    <div class="running-breakdown">
-                                        <span title="Beginning"><?= (int) $r['Beginning_Qty'] ?></span>
-                                        <span class="running-op">+</span>
-                                        <span title="Delivered today" class="running-delivered"><?= (int) $r['Delivered_Qty'] ?></span>
-                                        <span class="running-op">&minus;</span>
-                                        <span title="Sold today" class="running-sold"><?= (int) $r['Sold_Qty'] ?></span>
-                                        <span class="running-op">=</span>
-                                    </div>
-                                    <div class="running-qty-final"><?= $q ?></div>
-                                </div>
-                            <?php endforeach; ?>
+                <div class="inventory-saved-view inventory-flat">
+                    <h4 class="inventory-flat-heading">All Parts (<?= count($running_inventory) ?>)</h4>
+                    <?php foreach ($running_inventory as $r): ?>
+                        <?php
+                            $q = (int) $r['Running_Qty'];
+                            $row_class = '';
+                            if ($q < 0)       $row_class = 'running-row-negative';
+                            elseif ($q === 0) $row_class = 'running-row-zero';
+                            elseif ($q <= 5)  $row_class = 'running-row-low';
+                        ?>
+                        <div class="inventory-product-row running-product-row <?= $row_class ?>">
+                            <div class="inventory-product-name"><?= htmlspecialchars($r['Part_Name']) ?></div>
+                            <div class="inventory-product-unit"><?= htmlspecialchars($r['Unit']) ?></div>
+                            <div class="running-breakdown">
+                                <span title="Beginning"><?= (int) $r['Beginning_Qty'] ?></span>
+                                <span class="running-op">+</span>
+                                <span title="Delivered today" class="running-delivered"><?= (int) $r['Delivered_Qty'] ?></span>
+                                <span class="running-op">&minus;</span>
+                                <span title="Used by sales today" class="running-sold"><?= (int) $r['Used_Qty'] ?></span>
+                                <span class="running-op">=</span>
+                            </div>
+                            <div class="running-qty-final"><?= $q ?></div>
                         </div>
-                    <?php $first = false; endforeach; ?>
+                    <?php endforeach; ?>
                 </div>
 
                 <!-- Quick action: jump to ending tab to close the day -->
@@ -464,94 +405,74 @@
 
         <?php if ($has_ending): ?>
             <?php
-                $ending_grouped = [];
-                foreach ($ending as $row) {
-                    $ending_grouped[$row['Category_Name']][] = $row;
-                }
+                // Build a Part_ID -> beginning qty lookup for the "Beginning: X" reference
                 $beginning_qty_map = [];
                 foreach ($beginning as $b_row) {
-                    $beginning_qty_map[(int) $b_row['Product_ID']] = (int) $b_row['Quantity'];
+                    $beginning_qty_map[(int) $b_row['Part_ID']] = (int) $b_row['Quantity'];
                 }
             ?>
-            <div class="inventory-saved-view">
-                <div class="inventory-tabs" role="tablist">
-                    <?php $first = true; foreach ($ending_grouped as $category => $items): ?>
-                        <button type="button"
-                                class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                data-category="<?= htmlspecialchars($category) ?>"
-                                role="tab">
-                            <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                            <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                        </button>
-                    <?php $first = false; endforeach; ?>
-                </div>
-
-                <?php $first = true; foreach ($ending_grouped as $category => $items): ?>
-                    <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                         data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                        <?php foreach ($items as $row): ?>
-                            <?php
-                                $show_locked = $staff_locked || $row['Locked_status'];
-                                $beg_qty     = $beginning_qty_map[(int) $row['Product_ID']] ?? null;
-                                $is_warn     = $beg_qty !== null && (int) $row['Quantity'] > $beg_qty;
-                            ?>
-                            <div class="inventory-product-row<?= $is_warn ? ' inventory-row-warning' : '' ?>">
-                                <div class="inventory-product-name"><?= htmlspecialchars($row['Product_Name']) ?></div>
-                                <div class="inventory-product-unit"><?= htmlspecialchars($row['Unit']) ?></div>
-                                <?php if ($beg_qty !== null): ?>
-                                    <div class="inventory-ending-ref">Beginning: <strong><?= $beg_qty ?></strong></div>
-                                <?php endif; ?>
-                                <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
-                                <div class="inventory-saved-status">
-                                    <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
-                                        <?= $show_locked ? 'Locked' : 'Open' ?>
-                                    </span>
-                                </div>
-                                <?php if (Auth::isOwner()): ?>
-                                    <div class="inventory-saved-action">
-                                        <?php if ($row['Locked_status']): ?>
-                                            <form method="POST" action="<?= BASE_URL ?>/inventory/unlock" class="inline-form">
-                                                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                                                <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
-                                                <input type="hidden" name="date" value="<?= $date ?>">
-                                                <button type="button" class="btn btn-sm btn-outline"
-                                                        onclick="showConfirmModal({
-                                                            title: 'Unlock Record',
-                                                            message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
-                                                            confirmText: 'Yes, Unlock',
-                                                            type: 'unlock',
-                                                            onConfirm: () => this.closest('form').submit()
-                                                        })">Unlock</button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="text-light">&mdash;</span>
-                                        <?php endif; ?>
-                                    </div>
+            <div class="inventory-saved-view inventory-flat">
+                <h4 class="inventory-flat-heading">All Parts (<?= count($ending) ?>)</h4>
+                <?php foreach ($ending as $row): ?>
+                    <?php
+                        $show_locked = $staff_locked || $row['Locked_status'];
+                        $beg_qty     = $beginning_qty_map[(int) $row['Part_ID']] ?? null;
+                        $is_warn     = $beg_qty !== null && (int) $row['Quantity'] > $beg_qty;
+                    ?>
+                    <div class="inventory-product-row<?= $is_warn ? ' inventory-row-warning' : '' ?>">
+                        <div class="inventory-product-name"><?= htmlspecialchars($row['Part_Name']) ?></div>
+                        <div class="inventory-product-unit"><?= htmlspecialchars($row['Unit']) ?></div>
+                        <?php if ($beg_qty !== null): ?>
+                            <div class="inventory-ending-ref">Beginning: <strong><?= $beg_qty ?></strong></div>
+                        <?php endif; ?>
+                        <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
+                        <div class="inventory-saved-status">
+                            <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
+                                <?= $show_locked ? 'Locked' : 'Open' ?>
+                            </span>
+                        </div>
+                        <?php if (Auth::isOwner()): ?>
+                            <div class="inventory-saved-action">
+                                <?php if ($row['Locked_status']): ?>
+                                    <form method="POST" action="<?= BASE_URL ?>/inventory/unlock" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                        <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                        <input type="hidden" name="date" value="<?= $date ?>">
+                                        <button type="button" class="btn btn-sm btn-outline"
+                                                onclick="showConfirmModal({
+                                                    title: 'Unlock Record',
+                                                    message: 'Are you sure you want to unlock this inventory record? This will allow editing of past data.',
+                                                    confirmText: 'Yes, Unlock',
+                                                    type: 'unlock',
+                                                    onConfirm: () => this.closest('form').submit()
+                                                })">Unlock</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-light">&mdash;</span>
                                 <?php endif; ?>
                             </div>
-                        <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
-                <?php $first = false; endforeach; ?>
+                <?php endforeach; ?>
             </div>
         <?php elseif ($is_today && $has_beginning): ?>
-            <!-- Ending Stock Form (tab layout) — pre-filled with running inventory -->
+            <!-- Ending Stock Form — pre-filled from running parts inventory -->
             <?php
-                $running_qty_map  = [];
+                $running_qty_map   = [];
                 $beginning_qty_map = [];
                 foreach ($running_inventory as $r) {
-                    $running_qty_map[(int) $r['Product_ID']] = (int) $r['Running_Qty'];
+                    $running_qty_map[(int) $r['Part_ID']] = (int) $r['Running_Qty'];
                 }
                 foreach ($beginning as $row) {
-                    $beginning_qty_map[(int) $row['Product_ID']] = (int) $row['Quantity'];
+                    $beginning_qty_map[(int) $row['Part_ID']] = (int) $row['Quantity'];
                 }
-                $total_products = array_sum(array_map('count', $products));
             ?>
             <div class="ending-prefill-notice">
                 <strong>Pre-filled from running inventory.</strong>
                 Edit any row to override with the actual physical count.
             </div>
             <form method="POST" action="<?= BASE_URL ?>/inventory/store"
-                  class="inventory-entry-form" data-total="<?= $total_products ?>"
+                  class="inventory-entry-form" data-total="<?= $total_parts ?>"
                   data-label="Save Ending Stock">
                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                 <input type="hidden" name="snapshot_type" value="ending">
@@ -559,53 +480,39 @@
                 <input type="hidden" name="date" value="<?= $date ?>">
 
                 <div class="inventory-progress-label">
-                    <span class="inventory-filled-count">0</span> of <?= $total_products ?> products filled
+                    <span class="inventory-filled-count">0</span> of <?= $total_parts ?> parts filled
                 </div>
                 <div class="inventory-progress">
                     <div class="inventory-progress-bar" style="width:0%"></div>
                 </div>
 
-                <div class="inventory-tabs" role="tablist">
-                    <?php $first = true; foreach ($products as $category => $items): ?>
-                        <button type="button"
-                                class="inventory-tab<?= $first ? ' active' : '' ?>"
-                                data-category="<?= htmlspecialchars($category) ?>"
-                                role="tab">
-                            <span class="inventory-tab-name"><?= htmlspecialchars($category) ?></span>
-                            <span class="inventory-tab-meta">(<?= count($items) ?>)</span>
-                        </button>
-                    <?php $first = false; endforeach; ?>
-                </div>
-
-                <?php $first = true; foreach ($products as $category => $items): ?>
-                    <div class="inventory-tab-panel<?= $first ? ' active' : '' ?>"
-                         data-category="<?= htmlspecialchars($category) ?>" role="tabpanel">
-                        <?php foreach ($items as $product): ?>
-                            <?php
-                                $pid          = (int) $product['Product_ID'];
-                                $beg_qty      = $beginning_qty_map[$pid] ?? 0;
-                                $expected_qty = $running_qty_map[$pid] ?? $beg_qty;
-                                $prefill = max(0, $expected_qty);
-                            ?>
-                            <div class="inventory-product-row" data-beginning="<?= $beg_qty ?>" data-expected="<?= $expected_qty ?>">
-                                <div class="inventory-product-name"><?= htmlspecialchars($product['Name']) ?></div>
-                                <div class="inventory-product-unit"><?= htmlspecialchars($product['Unit']) ?></div>
-                                <div class="inventory-ending-ref">
-                                    Expected: <strong><?= $expected_qty ?></strong>
-                                    <span class="ending-ref-sub">(beg <?= $beg_qty ?>)</span>
-                                </div>
-                                <div class="inventory-qty-control">
-                                    <button type="button" class="inventory-qty-btn" data-action="dec" aria-label="Decrease">&minus;</button>
-                                    <input type="number"
-                                           name="qty[<?= $product['Product_ID'] ?>]"
-                                           class="inventory-qty-input"
-                                           min="0" value="<?= $prefill ?>" required>
-                                    <button type="button" class="inventory-qty-btn" data-action="inc" aria-label="Increase">+</button>
-                                </div>
+                <div class="inventory-flat">
+                    <h4 class="inventory-flat-heading">All Parts (<?= $total_parts ?>)</h4>
+                    <?php foreach ($parts as $part): ?>
+                        <?php
+                            $pid          = (int) $part['Part_ID'];
+                            $beg_qty      = $beginning_qty_map[$pid] ?? 0;
+                            $expected_qty = $running_qty_map[$pid] ?? $beg_qty;
+                            $prefill = max(0, $expected_qty);
+                        ?>
+                        <div class="inventory-product-row" data-beginning="<?= $beg_qty ?>" data-expected="<?= $expected_qty ?>">
+                            <div class="inventory-product-name"><?= htmlspecialchars($part['Name']) ?></div>
+                            <div class="inventory-product-unit"><?= htmlspecialchars($part['Unit']) ?></div>
+                            <div class="inventory-ending-ref">
+                                Expected: <strong><?= $expected_qty ?></strong>
+                                <span class="ending-ref-sub">(beg <?= $beg_qty ?>)</span>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php $first = false; endforeach; ?>
+                            <div class="inventory-qty-control">
+                                <button type="button" class="inventory-qty-btn" data-action="dec" aria-label="Decrease">&minus;</button>
+                                <input type="number"
+                                       name="qty[<?= $part['Part_ID'] ?>]"
+                                       class="inventory-qty-input"
+                                       min="0" value="<?= $prefill ?>" required>
+                                <button type="button" class="inventory-qty-btn" data-action="inc" aria-label="Increase">+</button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
 
                 <div class="inventory-sticky-submit">
                     <button type="button" class="btn btn-primary inventory-submit-btn"
@@ -616,7 +523,7 @@
                                 type: 'submit',
                                 onConfirm: () => this.closest('form').submit()
                             })">
-                        Save Ending Stock (<span class="inventory-filled-count">0</span> of <?= $total_products ?> filled)
+                        Save Ending Stock (<span class="inventory-filled-count">0</span> of <?= $total_parts ?> filled)
                     </button>
                 </div>
             </form>
@@ -633,7 +540,7 @@
 
 <script>
 /* Inventory step-tab switching — local to this page so it doesn't
-   collide with the category sub-tab JS in app.js. */
+   collide with any other tab JS. */
 (function () {
     const navBtns = document.querySelectorAll('.inventory-step-btn');
     const panels  = document.querySelectorAll('.inventory-step-panel');
@@ -642,7 +549,6 @@
     function activate(step) {
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.step === step));
         panels.forEach(p => p.classList.toggle('active', p.id === 'step-' + step));
-        // Scroll the wrapper into view so a long form doesn't strand the tab nav off-screen
         const wrapper = document.querySelector('.inventory-step-wrapper');
         if (wrapper) wrapper.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
@@ -651,7 +557,6 @@
         btn.addEventListener('click', () => activate(btn.dataset.step));
     });
 
-    // Quick-jump buttons inside any panel (e.g. the Running tab's "go to Ending")
     document.querySelectorAll('[data-jump-step]').forEach(btn => {
         btn.addEventListener('click', () => activate(btn.dataset.jumpStep));
     });

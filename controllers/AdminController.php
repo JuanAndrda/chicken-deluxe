@@ -10,6 +10,7 @@ require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/CategoryModel.php';
 require_once __DIR__ . '/../models/AuditLogModel.php';
 require_once __DIR__ . '/../models/TimeInModel.php';
+require_once __DIR__ . '/../models/PartModel.php';
 
 class AdminController extends Controller
 {
@@ -267,20 +268,44 @@ class AdminController extends Controller
     // PRODUCTS
     // ============================
 
-    /** Show product management page */
+    /** Show product management page (also hosts the Parts CRUD tab and recipe editor) */
     public function products(): void
     {
         Auth::requireRole([ROLE_OWNER]);
 
+        $partModel = new PartModel();
+        $products  = $this->productModel->getAll();
+
         $data = [
-            'page_title'  => 'Manage Products',
-            'products'    => $this->productModel->getAll(),
+            'page_title'  => 'Manage Products & Parts',
+            'products'    => $products,
             'categories'  => $this->categoryModel->getActive(),
+            'all_parts'   => $partModel->getActive(),     // for the recipe editor checkboxes
+            'parts_all'   => $partModel->getAll(),         // for the Parts tab table (incl. inactive)
+            'recipe_map'  => $this->buildRecipeMap($products),
             'success'     => $_GET['success'] ?? null,
             'error'       => $_GET['error'] ?? null,
         ];
 
         $this->render('admin/products', $data);
+    }
+
+    /**
+     * Build a [Product_ID => [Part_ID => Quantity_needed]] lookup map for
+     * the recipe editor so the view can pre-fill checkboxes + qty inputs
+     * without firing an extra query per row.
+     */
+    private function buildRecipeMap(array $products): array
+    {
+        $map = [];
+        foreach ($products as $p) {
+            $pid    = (int) $p['Product_ID'];
+            $recipe = $this->productModel->getRecipe($pid);
+            foreach ($recipe as $r) {
+                $map[$pid][(int) $r['Part_ID']] = (int) $r['Quantity_needed'];
+            }
+        }
+        return $map;
     }
 
     /** Handle create product form */
@@ -349,6 +374,102 @@ class AdminController extends Controller
         }
 
         $this->redirect('/admin/products?success=Product+updated');
+    }
+
+    // ============================
+    // PARTS (raw ingredients)
+    // ============================
+
+    /** Create a new Part — POST: name, unit */
+    public function createPart(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/admin/products?error=Invalid+request');
+            return;
+        }
+
+        $name = trim($this->post('name', ''));
+        $unit = trim($this->post('unit', 'pcs'));
+        if ($name === '') {
+            $this->redirect('/admin/products?tab=parts&error=Name+is+required');
+            return;
+        }
+
+        try {
+            $id = (new PartModel())->create($name, $unit);
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Created Part: {$name} (ID:{$id})");
+            $this->redirect('/admin/products?tab=parts&success=Part+added');
+        } catch (\Exception $e) {
+            // Likely a duplicate Name (UNIQUE uq_part_name) — surface a friendly error
+            $this->redirect('/admin/products?tab=parts&error=' . urlencode('Could not add part: ' . $e->getMessage()));
+        }
+    }
+
+    /** Update a Part — POST: part_id, name, unit, active */
+    public function updatePart(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/admin/products?error=Invalid+request');
+            return;
+        }
+
+        $part_id = (int) $this->post('part_id');
+        $name    = trim($this->post('name', ''));
+        $unit    = trim($this->post('unit', 'pcs'));
+        $active  = (bool) $this->post('active', 0);
+
+        if ($part_id <= 0 || $name === '') {
+            $this->redirect('/admin/products?tab=parts&error=Invalid+input');
+            return;
+        }
+
+        (new PartModel())->update($part_id, $name, $unit, $active);
+        $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Updated Part ID:{$part_id}");
+        $this->redirect('/admin/products?tab=parts&success=Part+updated');
+    }
+
+    /**
+     * Save a product's recipe — replaces the entire Product_Part set for the product.
+     * POST: product_id, part_ids[], quantities[]  (parallel arrays from the form)
+     */
+    public function saveRecipe(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/admin/products?error=Invalid+request');
+            return;
+        }
+
+        $product_id = (int) $this->post('product_id');
+        $part_ids   = $this->post('part_ids', []);
+        $quantities = $this->post('quantities', []);
+
+        if ($product_id <= 0) {
+            $this->redirect('/admin/products?error=Invalid+product');
+            return;
+        }
+        if (!is_array($part_ids)) $part_ids = [];
+
+        $items = [];
+        foreach ($part_ids as $idx => $pid) {
+            $qty = (int) ($quantities[$idx] ?? 0);
+            if ($qty <= 0) continue;
+            $items[] = [
+                'part_id'         => (int) $pid,
+                'quantity_needed' => $qty,
+            ];
+        }
+
+        $this->productModel->setRecipe($product_id, $items);
+        $this->auditLog->log(Auth::userId(), ACTION_UPDATE,
+            "Saved recipe for Product ID:{$product_id} (" . count($items) . " parts)");
+
+        $this->redirect("/admin/products?success=Recipe+saved#product-{$product_id}");
     }
 
     /**

@@ -284,6 +284,8 @@ These rules ensure Juan can easily add features, change logic, or update require
 - ❌ Never allow a staff user to access another kiosk's data
 - ❌ Never let anyone (except Owner) modify a locked record
 - ❌ Never add a trigger without checking if it already exists first
+- ❌ Never record inventory for products — always use parts (`Inventory_Snapshot.Part_ID`)
+- ❌ Never record deliveries for products — always use parts (`Delivery.Part_ID`); the legacy `Product_ID` columns exist only for historical rows
 
 ---
 

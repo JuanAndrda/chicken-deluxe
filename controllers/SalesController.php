@@ -42,31 +42,60 @@ class SalesController extends Controller
             if ($s['Locked_status']) { $any_locked = true; break; }
         }
 
-        // Build stock map: Product_ID => Running_Qty (null = no beginning recorded)
-        $stock_map = [];
+        // Build availability map: Product_ID => ['available' => bool, 'parts' => [...]]
+        // Computed locally from ONE running-parts query + ONE products+recipe query
+        // (avoids the N+1 cost of calling checkProductAvailability() per product).
+        $availability_map = [];
+        $product_map      = $this->productModel->getActiveAsMap();
         if ($is_today) {
-            $running = $this->inventoryModel->getRunningInventory($date, $kiosk_id);
-            foreach ($running as $row) {
-                $stock_map[(int) $row['Product_ID']] = (int) $row['Running_Qty'];
+            $running = $this->inventoryModel->getRunningPartsInventory($date, $kiosk_id);
+            $stock_by_part = [];
+            foreach ($running as $r) {
+                $stock_by_part[(int) $r['Part_ID']] = (int) $r['Running_Qty'];
+            }
+            foreach ($product_map as $pid => $p) {
+                $recipe = $p['Recipe'] ?? [];
+                if (empty($recipe)) {
+                    // No recipe defined → treat as unlimited (don't block sales)
+                    $availability_map[$pid] = ['available' => true, 'parts' => []];
+                    continue;
+                }
+                $ok_overall = true;
+                $parts_info = [];
+                foreach ($recipe as $r) {
+                    $part_id = (int) $r['Part_ID'];
+                    $needed  = (int) $r['Quantity_needed'];
+                    $have    = $stock_by_part[$part_id] ?? 0;
+                    $ok      = $have >= $needed;
+                    if (!$ok) $ok_overall = false;
+                    $parts_info[] = [
+                        'name'      => $r['Part_Name'],
+                        'needed'    => $needed,
+                        'available' => $have,
+                        'ok'        => $ok,
+                    ];
+                }
+                $availability_map[$pid] = ['available' => $ok_overall, 'parts' => $parts_info];
             }
         }
 
         $data = [
-            'page_title'   => 'Point of Sales',
-            'kiosk'        => $kiosk,
-            'kiosk_id'    => $kiosk_id,
-            'date'         => $date,
-            'sales'        => $sales,
-            'day_total'    => $day_total,
-            'is_today'     => $is_today,
-            'any_locked'   => $any_locked,
-            'products'     => $this->productModel->getActiveGrouped(),
-            'product_map'  => $this->productModel->getActiveAsMap(),
-            'stock_map'    => $stock_map,
-            'kiosks'       => Auth::isOwner() ? $this->kioskModel->getActive() : [],
-            'history'      => $this->salesModel->getRecordedDates($kiosk_id),
-            'success'      => $_GET['success'] ?? null,
-            'error'        => $_GET['error'] ?? null,
+            'page_title'      => 'Point of Sales',
+            'kiosk'           => $kiosk,
+            'kiosk_id'        => $kiosk_id,
+            'date'            => $date,
+            'sales'           => $sales,
+            'day_total'       => $day_total,
+            'is_today'        => $is_today,
+            'any_locked'      => $any_locked,
+            'products'        => $this->productModel->getActiveGrouped(),
+            'product_map'     => $product_map,
+            'availability_map'=> $availability_map,
+            'stock_map'       => [],   // legacy compat — no longer populated
+            'kiosks'          => Auth::isOwner() ? $this->kioskModel->getActive() : [],
+            'history'         => $this->salesModel->getRecordedDates($kiosk_id),
+            'success'         => $_GET['success'] ?? null,
+            'error'           => $_GET['error'] ?? null,
         ];
 
         $this->render('sales/index', $data);
@@ -165,10 +194,31 @@ class SalesController extends Controller
         try {
             $count = $this->salesModel->createBatch($kiosk_id, Auth::userId(), $date, $items);
 
+            // Calculate which PARTS were consumed by this batch (for audit log only —
+            // no separate INSERT needed; the running inventory derives consumption
+            // live from Sales × Product_Part).
+            $parts_consumed = [];
+            foreach ($items as $item) {
+                foreach ($this->productModel->getRecipe($item['product_id']) as $r) {
+                    $part_id = (int) $r['Part_ID'];
+                    $parts_consumed[$part_id] =
+                        ($parts_consumed[$part_id] ?? 0)
+                        + (int) $r['Quantity_needed'] * (int) $item['quantity_sold'];
+                }
+            }
+            $consumed_summary = '';
+            if (!empty($parts_consumed)) {
+                $bits = [];
+                foreach ($parts_consumed as $pid => $qty) {
+                    $bits[] = "Part#{$pid}:x{$qty}";
+                }
+                $consumed_summary = ' | Parts consumed: ' . implode(', ', $bits);
+            }
+
             $this->auditLog->log(
                 Auth::userId(),
                 ACTION_CREATE,
-                "Batch sale: {$count} product(s), {$total_qty} total units for kiosk {$kiosk_id} on {$date}"
+                "Batch sale: {$count} product(s), {$total_qty} total units for kiosk {$kiosk_id} on {$date}{$consumed_summary}"
             );
 
             $this->redirect("/sales?date={$date}&kiosk_id={$kiosk_id}&success=Order+confirmed+({$count}+items+saved)");

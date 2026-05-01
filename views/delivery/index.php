@@ -109,7 +109,7 @@
                             <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                             <input type="hidden" name="kiosk_id"   value="<?= $kiosk_id ?>">
                             <input type="hidden" name="date"       value="<?= $date ?>">
-                            <input type="hidden" name="product_id" id="entryProductId">
+                            <input type="hidden" name="part_id"    id="entryProductId">
 
                             <div class="delivery-qty-row">
                                 <label class="delivery-qty-label">Quantity Delivered</label>
@@ -137,43 +137,38 @@
                     </div>
                 </div>
 
-                <!-- Product table -->
+                <!-- Parts table -->
                 <div class="delivery-grid-section">
-                    <h3 class="delivery-grid-title">Select Product</h3>
+                    <h3 class="delivery-grid-title">Select Part</h3>
                     <div class="delivery-product-table-wrap">
                         <table class="delivery-select-table">
                             <thead>
                                 <tr>
-                                    <th>Product</th>
-                                    <th>Category</th>
+                                    <th>Part</th>
+                                    <th>Type</th>
                                     <th>Unit</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="deliveryProductGrid">
-                                <?php foreach ($products as $category => $items): ?>
-                                    <?php foreach ($items as $product): ?>
-                                        <?php $imgUrl = ProductModel::getProductImagePath($product['Name']); ?>
-                                        <tr class="delivery-product-row"
-                                            data-id="<?= $product['Product_ID'] ?>"
-                                            data-name="<?= htmlspecialchars($product['Name']) ?>"
-                                            data-unit="<?= htmlspecialchars($product['Unit']) ?>"
-                                            data-img="<?= htmlspecialchars($imgUrl) ?>"
-                                            data-category="<?= htmlspecialchars($category) ?>">
-                                            <td><?= htmlspecialchars($product['Name']) ?></td>
-                                            <td>
-                                                <span class="badge badge-category">
-                                                    <?= htmlspecialchars($category) ?>
-                                                </span>
-                                            </td>
-                                            <td><?= htmlspecialchars($product['Unit']) ?></td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-primary delivery-select-btn">
-                                                    Select
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
+                                <?php foreach ($parts as $part): ?>
+                                    <tr class="delivery-product-row"
+                                        data-id="<?= $part['Part_ID'] ?>"
+                                        data-name="<?= htmlspecialchars($part['Name']) ?>"
+                                        data-unit="<?= htmlspecialchars($part['Unit']) ?>"
+                                        data-img=""
+                                        data-category="parts">
+                                        <td><?= htmlspecialchars($part['Name']) ?></td>
+                                        <td>
+                                            <span class="delivery-parts-badge">Part</span>
+                                        </td>
+                                        <td><?= htmlspecialchars($part['Unit']) ?></td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-primary delivery-select-btn">
+                                                Select
+                                            </button>
+                                        </td>
+                                    </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -294,9 +289,10 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Product</th>
+                                <th>Item</th>
+                                <th>Source</th>
                                 <th>Category</th>
-                                <th>Type</th>
+                                <th>Op</th>
                                 <th>Quantity</th>
                                 <th>Notes</th>
                                 <th>Recorded By</th>
@@ -309,10 +305,15 @@
                             <?php foreach ($deliveries as $d): ?>
                                 <?php $show_locked = $staff_locked || $d['Locked_status']; ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($d['Product_Name']) ?></td>
+                                    <td><?= htmlspecialchars($d['Display_Name'] ?? '—') ?></td>
+                                    <td>
+                                        <span class="<?= ($d['Source'] ?? 'Product') === 'Part' ? 'delivery-parts-badge' : 'badge badge-category' ?>">
+                                            <?= htmlspecialchars($d['Source'] === 'Part' ? 'Part Delivery' : 'Product Delivery') ?>
+                                        </span>
+                                    </td>
                                     <td>
                                         <span class="badge badge-category">
-                                            <?= htmlspecialchars($d['Category_Name'] ?? '—') ?>
+                                            <?= htmlspecialchars($d['Display_Cat'] ?? '—') ?>
                                         </span>
                                     </td>
                                     <td>
@@ -377,7 +378,7 @@
                                 <?php if (!$d['Locked_status'] && Auth::isOwner()): ?>
                                     <tr id="delivery-edit-<?= $d['Delivery_ID'] ?>"
                                         class="inline-edit-row" style="display:none;">
-                                        <td colspan="<?= Auth::isOwner() ? 9 : 8 ?>">
+                                        <td colspan="<?= Auth::isOwner() ? 10 : 9 ?>">
                                             <form method="POST" action="<?= BASE_URL ?>/delivery/update"
                                                   class="inline-edit-form">
                                                 <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
@@ -385,9 +386,9 @@
                                                 <input type="hidden" name="date" value="<?= $date ?>">
                                                 <div class="inline-edit-fields">
                                                     <div class="form-group">
-                                                        <label>Product</label>
+                                                        <label>Item</label>
                                                         <input type="text" class="form-input input-sm"
-                                                               value="<?= htmlspecialchars($d['Product_Name']) ?>" disabled>
+                                                               value="<?= htmlspecialchars($d['Display_Name'] ?? '—') ?>" disabled>
                                                     </div>
                                                     <div class="form-group">
                                                         <label>Quantity</label>

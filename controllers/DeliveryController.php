@@ -6,6 +6,7 @@ require_once __DIR__ . '/../models/DeliveryModel.php';
 require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/KioskModel.php';
 require_once __DIR__ . '/../models/AuditLogModel.php';
+require_once __DIR__ . '/../models/PartModel.php';
 
 class DeliveryController extends Controller
 {
@@ -13,6 +14,7 @@ class DeliveryController extends Controller
     private ProductModel $productModel;
     private KioskModel $kioskModel;
     private AuditLogModel $auditLog;
+    private PartModel $partModel;
 
     public function __construct()
     {
@@ -20,6 +22,7 @@ class DeliveryController extends Controller
         $this->productModel  = new ProductModel();
         $this->kioskModel    = new KioskModel();
         $this->auditLog      = new AuditLogModel();
+        $this->partModel     = new PartModel();
     }
 
     /** Show delivery page */
@@ -31,8 +34,29 @@ class DeliveryController extends Controller
         $kiosk     = $this->kioskModel->findById($kiosk_id);
         $date      = $this->get('date', date('Y-m-d'));
 
-        $deliveries = $this->deliveryModel->getByDateAndKiosk($date, $kiosk_id);
-        $is_today   = ($date === date('Y-m-d'));
+        $is_today = ($date === date('Y-m-d'));
+
+        // Build a unified delivery list: new part-based rows + historical product rows.
+        // Each row carries Source ('Part'|'Product') and Display_Name so the view loops once.
+        $part_deliveries    = $this->deliveryModel->getPartsByDateAndKiosk($date, $kiosk_id);
+        $product_deliveries = $this->deliveryModel->getByDateAndKiosk($date, $kiosk_id);
+
+        $deliveries = [];
+        foreach ($part_deliveries as $r) {
+            $r['Source']        = 'Part';
+            $r['Display_Name']  = $r['Part_Name'];
+            $r['Display_Cat']   = 'Parts';
+            $deliveries[] = $r;
+        }
+        foreach ($product_deliveries as $r) {
+            $r['Source']        = 'Product';
+            $r['Display_Name']  = $r['Product_Name'];
+            $r['Display_Cat']   = $r['Category_Name'] ?? '—';
+            $deliveries[] = $r;
+        }
+        // Newest first (Created_at DESC) — both source queries already sort that way; merge keeps it close enough
+        usort($deliveries, fn($a, $b) => strcmp($b['Created_at'] ?? '', $a['Created_at'] ?? ''));
+
         $any_locked = false;
         foreach ($deliveries as $d) {
             if ($d['Locked_status']) { $any_locked = true; break; }
@@ -41,12 +65,13 @@ class DeliveryController extends Controller
         $data = [
             'page_title'  => 'Deliveries',
             'kiosk'       => $kiosk,
-            'kiosk_id'   => $kiosk_id,
+            'kiosk_id'    => $kiosk_id,
             'date'        => $date,
             'deliveries'  => $deliveries,
             'is_today'    => $is_today,
             'any_locked'  => $any_locked,
-            'products'    => $this->productModel->getActiveGrouped(),
+            'parts'       => $this->partModel->getActive(),     // entry table (new)
+            'products'    => $this->productModel->getActiveGrouped(),  // pullout dropdown still uses products
             'product_map' => $this->productModel->getActiveAsMap(),
             'kiosks'      => Auth::isOwner() ? $this->kioskModel->getActive() : [],
             'history'     => $this->deliveryModel->getRecordedDates($kiosk_id),
@@ -68,6 +93,8 @@ class DeliveryController extends Controller
         }
 
         $kiosk_id  = $this->resolveKiosk();
+        // Accept part_id (new parts-based path); fall back to product_id for safety
+        $part_id    = (int) $this->post('part_id');
         $product_id = (int) $this->post('product_id');
         $quantity   = (int) $this->post('quantity');
         $date       = $this->post('date', date('Y-m-d'));
@@ -77,13 +104,19 @@ class DeliveryController extends Controller
             return;
         }
 
-        if ($product_id <= 0 || $quantity <= 0) {
-            $this->redirect("/delivery?date={$date}&error=Product+and+quantity+are+required");
+        if (($part_id <= 0 && $product_id <= 0) || $quantity <= 0) {
+            $this->redirect("/delivery?date={$date}&error=Item+and+quantity+are+required");
             return;
         }
 
-        $delivery_id = $this->deliveryModel->create($kiosk_id, Auth::userId(), $product_id, $date, $quantity);
-        $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Delivery ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
+        if ($part_id > 0) {
+            $delivery_id = $this->deliveryModel->createPartDelivery($kiosk_id, Auth::userId(), $part_id, $date, $quantity);
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Delivery ID:{$delivery_id} — part:{$part_id}, qty:{$quantity}");
+        } else {
+            // Legacy product-based path — kept for safety / backwards compat
+            $delivery_id = $this->deliveryModel->create($kiosk_id, Auth::userId(), $product_id, $date, $quantity);
+            $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Delivery ID:{$delivery_id} — product:{$product_id}, qty:{$quantity}");
+        }
 
         $this->redirect("/delivery?date={$date}&success=Delivery+recorded");
     }

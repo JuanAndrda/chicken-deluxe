@@ -96,20 +96,25 @@
                                 <?php
                                     $imgUrl  = ProductModel::getProductImagePath($product['Name']);
                                     $pid     = (int) $product['Product_ID'];
-                                    // stock_map only populated for today; null = no beginning recorded
-                                    $has_inv = array_key_exists($pid, $stock_map ?? []);
-                                    $stock   = $has_inv ? ($stock_map[$pid] ?? 0) : null;
-                                    $avail   = ($stock === null) ? 0 : ($stock > 0 ? 1 : 0);
-                                    // Badge text
-                                    if (!$is_today) {
-                                        $badge_txt = ''; $badge_cls = '';
-                                    } elseif ($stock === null) {
-                                        $badge_txt = 'No Inventory'; $badge_cls = 'pos-stock-none';
-                                    } elseif ($stock <= 0) {
-                                        $badge_txt = 'Out of Stock'; $badge_cls = 'pos-stock-none';
-                                    } else {
-                                        $badge_txt = 'Stock: ' . $stock . ' pcs'; $badge_cls = 'pos-stock-ok';
+
+                                    // Parts-based availability check
+                                    $avail_info = $availability_map[$pid] ?? null;
+                                    $avail      = (!$is_today || $avail_info === null)
+                                                ? 1            // no inventory recorded yet → don't block
+                                                : ($avail_info['available'] ? 1 : 0);
+
+                                    // Build short list of missing parts for the tooltip
+                                    $missing_parts = [];
+                                    if ($avail_info && !$avail_info['available']) {
+                                        foreach ($avail_info['parts'] as $p_check) {
+                                            if (!$p_check['ok']) {
+                                                $missing_parts[] = $p_check['name']
+                                                    . ' (need ' . $p_check['needed']
+                                                    . ', have ' . $p_check['available'] . ')';
+                                            }
+                                        }
                                     }
+                                    $tooltip = !empty($missing_parts) ? implode('; ', $missing_parts) : '';
                                 ?>
                                 <button type="button"
                                         class="pos-product-card <?= ($is_today && !$avail) ? 'pos-unavailable' : '' ?>"
@@ -120,7 +125,7 @@
                                         data-img="<?= htmlspecialchars($imgUrl) ?>"
                                         data-category="<?= htmlspecialchars($category) ?>"
                                         data-available="<?= $avail ?>"
-                                        data-stock="<?= $stock ?? 'null' ?>">
+                                        <?= $tooltip ? 'title="Missing parts: ' . htmlspecialchars($tooltip) . '"' : '' ?>>
                                     <img class="pos-product-img"
                                          src="<?= htmlspecialchars($imgUrl) ?>"
                                          alt="<?= htmlspecialchars($product['Name']) ?>"
@@ -131,10 +136,17 @@
                                     <span class="pos-product-price">
                                         P<?= number_format($product['Price'], 2) ?>
                                     </span>
-                                    <?php if ($is_today && $badge_txt): ?>
-                                        <span class="pos-stock-badge <?= $badge_cls ?>">
-                                            <?= $badge_txt ?>
-                                        </span>
+                                    <?php if ($is_today && $avail_info !== null): ?>
+                                        <?php if (!$avail): ?>
+                                            <span class="pos-stock-badge pos-stock-none"
+                                                  title="<?= htmlspecialchars($tooltip) ?>">
+                                                Parts Low
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="pos-stock-badge pos-stock-ok">
+                                                Available
+                                            </span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </button>
                             <?php endforeach; ?>

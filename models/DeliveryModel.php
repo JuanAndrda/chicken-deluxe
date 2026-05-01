@@ -94,4 +94,40 @@ class DeliveryModel extends Model
             [$kiosk_id, $user_id, $product_id, $date, $quantity, $notes]
         );
     }
+
+    // ============================================================
+    // PARTS-BASED DELIVERY (added 2026-04-27)
+    // The new system delivers PARTS not finished products.
+    // Existing product-based methods above remain for historical rows.
+    // ============================================================
+
+    /** Create a parts delivery record — returns new Delivery_ID */
+    public function createPartDelivery(int $kiosk_id, int $user_id, int $part_id, string $date, int $quantity): int
+    {
+        return $this->db->insert(
+            "INSERT INTO Delivery (Kiosk_ID, User_ID, Part_ID, Delivery_Date, Quantity)
+             VALUES (?, ?, ?, ?, ?)",
+            [$kiosk_id, $user_id, $part_id, $date, $quantity]
+        );
+    }
+
+    /**
+     * Get parts deliveries for a date and kiosk.
+     * Filters out historical product-based rows (Part_ID NULL).
+     */
+    public function getPartsByDateAndKiosk(string $date, int $kiosk_id): array
+    {
+        return $this->db->read(
+            "SELECT d.*, pt.Name AS Part_Name, pt.Unit,
+                    u.Full_name AS Recorded_by
+             FROM   Delivery d
+             JOIN   Part pt ON d.Part_ID = pt.Part_ID
+             JOIN   User u  ON d.User_ID = u.User_ID
+             WHERE  d.Kiosk_ID      = ?
+               AND  d.Delivery_Date = ?
+               AND  d.Part_ID       IS NOT NULL
+             ORDER  BY d.Created_at DESC",
+            [$kiosk_id, $date]
+        );
+    }
 }

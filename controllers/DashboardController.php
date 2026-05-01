@@ -53,7 +53,8 @@ class DashboardController extends Controller
     private function buildOwnerData(string $today): array
     {
         $today_sales_by_kiosk    = $this->salesModel->getDailyTotalByKiosk($today);
-        $kiosk_inventory_status  = $this->inventoryModel->getKioskInventoryStatus($today);
+        // Parts-based: only count rows where Part_ID IS NOT NULL
+        $kiosk_inventory_status  = $this->inventoryModel->getKioskPartsInventoryStatus($today);
         $total_kiosks            = count($kiosk_inventory_status);
 
         $missing_beginning = 0;
@@ -93,10 +94,11 @@ class DashboardController extends Controller
         $kiosk    = $kiosk_id ? $this->kioskModel->findById($kiosk_id) : null;
 
         $today_sales_total          = $kiosk_id ? $this->salesModel->getDailyTotal($today, $kiosk_id) : 0.0;
-        $has_beginning_today        = $kiosk_id ? $this->inventoryModel->hasBeginningToday($kiosk_id) : false;
-        $has_ending_today           = $kiosk_id ? $this->inventoryModel->hasEndingToday($kiosk_id) : false;
+        // Parts-based today checks (filter on Part_ID IS NOT NULL)
+        $has_beginning_today        = $kiosk_id ? $this->inventoryModel->hasPartsBeginningToday($kiosk_id) : false;
+        $has_ending_today           = $kiosk_id ? $this->inventoryModel->hasPartsEndingToday($kiosk_id) : false;
         $previous_ending_available  = $kiosk_id
-            ? !empty($this->inventoryModel->getPreviousDayEnding($kiosk_id, $today))
+            ? !empty($this->inventoryModel->getPreviousDayEndingParts($kiosk_id, $today))
             : false;
 
         return [

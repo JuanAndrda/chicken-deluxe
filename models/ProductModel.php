@@ -38,7 +38,14 @@ class ProductModel extends Model
         return $grouped;
     }
 
-    /** Get active products as a flat JSON-safe array keyed by Product_ID */
+    /**
+     * Get active products as a flat JSON-safe array keyed by Product_ID.
+     * Each entry now also carries a 'Recipe' key — a list of the parts
+     * that make up the product. Used by the POS to know what to deduct.
+     *
+     * Recipe is loaded with a single JOIN query (not per-product) to avoid
+     * an N+1 round-trip on every page load.
+     */
     public function getActiveAsMap(): array
     {
         $products = $this->getActive();
@@ -51,9 +58,75 @@ class ProductModel extends Model
                 'Unit'          => $p['Unit'],
                 'Price'         => (float) $p['Price'],
                 'Image'         => self::getProductImagePath($p['Name']),
+                'Recipe'        => [],
+            ];
+        }
+
+        // One query for ALL recipes, then group in PHP — avoids N+1.
+        $recipeRows = $this->db->read(
+            "SELECT pp.Product_ID, pp.Part_ID, pt.Name AS Part_Name,
+                    pt.Unit, pp.Quantity_needed
+             FROM   Product_Part pp
+             JOIN   Part pt ON pp.Part_ID = pt.Part_ID
+             ORDER  BY pp.Product_ID, pt.Name"
+        );
+        foreach ($recipeRows as $r) {
+            $pid = (int) $r['Product_ID'];
+            if (!isset($map[$pid])) continue;  // inactive product — skip
+            $map[$pid]['Recipe'][] = [
+                'Part_ID'         => (int) $r['Part_ID'],
+                'Part_Name'       => $r['Part_Name'],
+                'Unit'            => $r['Unit'],
+                'Quantity_needed' => (int) $r['Quantity_needed'],
             ];
         }
         return $map;
+    }
+
+    /**
+     * Get a product's recipe — list of parts + quantity needed per unit.
+     * Returns rows: ['Part_ID', 'Part_Name', 'Unit', 'Quantity_needed'].
+     */
+    public function getRecipe(int $product_id): array
+    {
+        return $this->db->read(
+            "SELECT pp.Part_ID, pt.Name AS Part_Name,
+                    pt.Unit, pp.Quantity_needed
+             FROM   Product_Part pp
+             JOIN   Part pt ON pp.Part_ID = pt.Part_ID
+             WHERE  pp.Product_ID = ?
+             ORDER  BY pt.Name",
+            [$product_id]
+        );
+    }
+
+    /**
+     * Replace a product's full recipe atomically.
+     * $items shape: [['part_id' => int, 'quantity_needed' => int], ...]
+     * Items with quantity_needed <= 0 are silently dropped.
+     */
+    public function setRecipe(int $product_id, array $items): void
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->write(
+                "DELETE FROM Product_Part WHERE Product_ID = ?",
+                [$product_id]
+            );
+            foreach ($items as $item) {
+                $qty = (int) ($item['quantity_needed'] ?? 0);
+                if ($qty <= 0) continue;
+                $this->db->insert(
+                    "INSERT INTO Product_Part (Product_ID, Part_ID, Quantity_needed)
+                     VALUES (?, ?, ?)",
+                    [$product_id, (int) $item['part_id'], $qty]
+                );
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**

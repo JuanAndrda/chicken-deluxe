@@ -145,18 +145,38 @@ The system covers 5 kiosk kiosks:
 | Active | BOOLEAN | |
 | Created_at | DATETIME | |
 
+#### `Part` *(added 2026-04 — parts-based inventory)*
+| Column | Type | Notes |
+|--------|------|-------|
+| Part_ID | PK | |
+| Name | VARCHAR(100) | UNIQUE — e.g. Burger Bun, Patty, Cheese Slice |
+| Unit | VARCHAR(30) | pcs / cup / pack / bottle / can / tsp / kg / g / ml |
+| Active | BOOLEAN | Soft-delete flag |
+| Created_at | DATETIME | |
+
+#### `Product_Part` *(added 2026-04 — recipe junction)*
+| Column | Type | Notes |
+|--------|------|-------|
+| Product_Part_ID | PK | |
+| Product_ID | FK → Product | ON DELETE CASCADE |
+| Part_ID | FK → Part | ON DELETE RESTRICT |
+| Quantity_needed | INT | Parts of this type needed to make 1 unit of the product |
+| | | UNIQUE (Product_ID, Part_ID) — one row per part per product |
+
 #### `Inventory_Snapshot`
 | Column | Type | Notes |
 |--------|------|-------|
 | Inventory_ID | PK | |
 | Kiosk_ID | FK → Kiosk | |
-| Product_ID | FK → Product | |
+| Product_ID | FK → Product | NULLable — kept for historical rows only |
+| Part_ID | FK → Part | **Primary reference column** for new rows (parts-based inventory) |
 | User_ID | FK → User | |
 | Locked_status | BOOLEAN | Auto-locked end of day |
 | Snapshot_date | DATE | |
 | Snapshot_type | ENUM | 'beginning' / 'ending' |
 | Quantity | INT | |
 | Recorded_at | DATETIME | |
+| | | UNIQUE `uq_snapshot_part` (Kiosk_ID, Part_ID, Snapshot_date, Snapshot_type) |
 
 #### `Delivery` (merged with Delivery_Item)
 | Column | Type | Notes |
@@ -164,9 +184,13 @@ The system covers 5 kiosk kiosks:
 | Delivery_ID | PK | |
 | Kiosk_ID | FK → Kiosk | |
 | User_ID | FK → User | |
-| Product_ID | FK → Product | |
+| Product_ID | FK → Product | NULLable — kept for historical rows only |
+| Part_ID | FK → Part | **Primary reference column** for new rows (parts-based deliveries) |
 | Delivery_Date | DATE | |
 | Quantity | INT | |
+| Type | VARCHAR(20) | 'Delivery' or 'Pullout' |
+| Notes | VARCHAR(255) | Reason for pullout, etc. |
+| Locked_status | BOOLEAN | |
 | Created_at | DATETIME | |
 
 #### `Sales` (merged with Sales_Item)
