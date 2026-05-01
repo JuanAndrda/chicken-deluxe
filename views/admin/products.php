@@ -94,26 +94,28 @@
             </div>
         </details>
 
-        <!-- Per-product hidden forms -->
-        <?php foreach ($products as $product): ?>
-            <form id="edit-<?= $product['Product_ID'] ?>"
-                  method="POST" action="<?= BASE_URL ?>/admin/products/update"
-                  enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                <input type="hidden" name="product_id" value="<?= $product['Product_ID'] ?>">
-                <input type="hidden" name="active" value="<?= (int) $product['Active'] ?>">
-            </form>
-            <form id="toggle-<?= $product['Product_ID'] ?>"
-                  method="POST" action="<?= BASE_URL ?>/admin/products/update" class="inline-form">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                <input type="hidden" name="product_id" value="<?= $product['Product_ID'] ?>">
-                <input type="hidden" name="name" value="<?= htmlspecialchars($product['Name']) ?>">
-                <input type="hidden" name="category_id" value="<?= $product['Category_ID'] ?>">
-                <input type="hidden" name="unit" value="<?= htmlspecialchars($product['Unit']) ?>">
-                <input type="hidden" name="price" value="<?= $product['Price'] ?>">
-                <input type="hidden" name="active" value="<?= $product['Active'] ? '0' : '1' ?>">
-            </form>
-        <?php endforeach; ?>
+        <!-- Per-product hidden forms — kept in the DOM (referenced by form= attribute on table buttons) but take 0 layout space -->
+        <div class="hidden-forms-bag" hidden>
+            <?php foreach ($products as $product): ?>
+                <form id="edit-<?= $product['Product_ID'] ?>"
+                      method="POST" action="<?= BASE_URL ?>/admin/products/update"
+                      enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                    <input type="hidden" name="product_id" value="<?= $product['Product_ID'] ?>">
+                    <input type="hidden" name="active" value="<?= (int) $product['Active'] ?>">
+                </form>
+                <form id="toggle-<?= $product['Product_ID'] ?>"
+                      method="POST" action="<?= BASE_URL ?>/admin/products/update" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                    <input type="hidden" name="product_id" value="<?= $product['Product_ID'] ?>">
+                    <input type="hidden" name="name" value="<?= htmlspecialchars($product['Name']) ?>">
+                    <input type="hidden" name="category_id" value="<?= $product['Category_ID'] ?>">
+                    <input type="hidden" name="unit" value="<?= htmlspecialchars($product['Unit']) ?>">
+                    <input type="hidden" name="price" value="<?= $product['Price'] ?>">
+                    <input type="hidden" name="active" value="<?= $product['Active'] ? '0' : '1' ?>">
+                </form>
+            <?php endforeach; ?>
+        </div>
 
         <!-- Products Table (inline editable + per-row recipe panel) -->
         <div class="table-container">
@@ -306,23 +308,25 @@
             </div>
         </details>
 
-        <!-- Per-part hidden forms (HTML5 form attribute pattern, same as products) -->
-        <?php foreach ($parts_all as $part): ?>
-            <form id="edit-part-<?= $part['Part_ID'] ?>"
-                  method="POST" action="<?= BASE_URL ?>/admin/parts/update">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                <input type="hidden" name="part_id" value="<?= $part['Part_ID'] ?>">
-                <input type="hidden" name="active" value="<?= (int) $part['Active'] ?>">
-            </form>
-            <form id="toggle-part-<?= $part['Part_ID'] ?>"
-                  method="POST" action="<?= BASE_URL ?>/admin/parts/update" class="inline-form">
-                <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
-                <input type="hidden" name="part_id" value="<?= $part['Part_ID'] ?>">
-                <input type="hidden" name="name" value="<?= htmlspecialchars($part['Name']) ?>">
-                <input type="hidden" name="unit" value="<?= htmlspecialchars($part['Unit']) ?>">
-                <input type="hidden" name="active" value="<?= $part['Active'] ? '0' : '1' ?>">
-            </form>
-        <?php endforeach; ?>
+        <!-- Per-part hidden forms — bagged so they take 0 layout space -->
+        <div class="hidden-forms-bag" hidden>
+            <?php foreach ($parts_all as $part): ?>
+                <form id="edit-part-<?= $part['Part_ID'] ?>"
+                      method="POST" action="<?= BASE_URL ?>/admin/parts/update">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                    <input type="hidden" name="part_id" value="<?= $part['Part_ID'] ?>">
+                    <input type="hidden" name="active" value="<?= (int) $part['Active'] ?>">
+                </form>
+                <form id="toggle-part-<?= $part['Part_ID'] ?>"
+                      method="POST" action="<?= BASE_URL ?>/admin/parts/update" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                    <input type="hidden" name="part_id" value="<?= $part['Part_ID'] ?>">
+                    <input type="hidden" name="name" value="<?= htmlspecialchars($part['Name']) ?>">
+                    <input type="hidden" name="unit" value="<?= htmlspecialchars($part['Unit']) ?>">
+                    <input type="hidden" name="active" value="<?= $part['Active'] ? '0' : '1' ?>">
+                </form>
+            <?php endforeach; ?>
+        </div>
 
         <!-- Parts Table -->
         <div class="table-container">
