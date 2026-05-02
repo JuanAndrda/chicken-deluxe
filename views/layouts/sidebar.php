@@ -17,7 +17,9 @@
 ?>
 <aside class="sidebar">
     <div class="sidebar-header">
-        <h2><?= APP_NAME ?></h2>
+        <img src="<?= BASE_URL ?>/assets/img/graphics/Logo.png"
+             alt="<?= APP_NAME ?>"
+             class="sidebar-logo">
     </div>
 
     <nav class="sidebar-nav">

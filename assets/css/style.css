@@ -69,10 +69,11 @@ a:hover {
     text-align: center;
     margin-bottom: 24px;
 }
-.login-header h1 {
-    color: var(--primary);
-    font-size: 1.8rem;
-    margin-bottom: 4px;
+.login-logo {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto 8px;
 }
 .login-header p {
     color: var(--text-light);
@@ -219,9 +220,10 @@ a:hover {
     padding: 20px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar-header h2 {
-    font-size: 1.2rem;
-    color: var(--accent);
+.sidebar-logo {
+    width: 100%;
+    height: auto;
+    display: block;
 }
 
 .sidebar-nav {

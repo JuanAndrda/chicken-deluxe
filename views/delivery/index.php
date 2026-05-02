@@ -147,11 +147,13 @@
                                     <th>Part</th>
                                     <th>Type</th>
                                     <th>Unit</th>
+                                    <th>Stock</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="deliveryProductGrid">
                                 <?php foreach ($parts as $part): ?>
+                                    <?php $stock = $part_stock[$part['Part_ID']] ?? null; ?>
                                     <tr class="delivery-product-row"
                                         data-id="<?= $part['Part_ID'] ?>"
                                         data-name="<?= htmlspecialchars($part['Name']) ?>"
@@ -163,6 +165,13 @@
                                             <span class="delivery-parts-badge">Part</span>
                                         </td>
                                         <td><?= htmlspecialchars($part['Unit']) ?></td>
+                                        <td>
+                                            <?php if ($stock !== null): ?>
+                                                <strong><?= $stock ?></strong> pcs
+                                            <?php else: ?>
+                                                <span style="color:var(--color-muted,#888);">—</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <button type="button" class="btn btn-sm btn-primary delivery-select-btn">
                                                 Select

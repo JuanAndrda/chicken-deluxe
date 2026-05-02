@@ -7,6 +7,7 @@ require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/KioskModel.php';
 require_once __DIR__ . '/../models/AuditLogModel.php';
 require_once __DIR__ . '/../models/PartModel.php';
+require_once __DIR__ . '/../models/InventoryModel.php';
 
 class DeliveryController extends Controller
 {
@@ -15,14 +16,16 @@ class DeliveryController extends Controller
     private KioskModel $kioskModel;
     private AuditLogModel $auditLog;
     private PartModel $partModel;
+    private InventoryModel $inventoryModel;
 
     public function __construct()
     {
-        $this->deliveryModel = new DeliveryModel();
-        $this->productModel  = new ProductModel();
-        $this->kioskModel    = new KioskModel();
-        $this->auditLog      = new AuditLogModel();
-        $this->partModel     = new PartModel();
+        $this->deliveryModel  = new DeliveryModel();
+        $this->productModel   = new ProductModel();
+        $this->kioskModel     = new KioskModel();
+        $this->auditLog       = new AuditLogModel();
+        $this->partModel      = new PartModel();
+        $this->inventoryModel = new InventoryModel();
     }
 
     /** Show delivery page */
@@ -62,6 +65,13 @@ class DeliveryController extends Controller
             if ($d['Locked_status']) { $any_locked = true; break; }
         }
 
+        // Build a Part_ID → Running_Qty map so the Select Part table can show current stock
+        $running_parts = $this->inventoryModel->getRunningPartsInventory($date, $kiosk_id);
+        $part_stock = [];
+        foreach ($running_parts as $r) {
+            $part_stock[(int) $r['Part_ID']] = (int) $r['Running_Qty'];
+        }
+
         $data = [
             'page_title'  => 'Deliveries',
             'kiosk'       => $kiosk,
@@ -70,8 +80,9 @@ class DeliveryController extends Controller
             'deliveries'  => $deliveries,
             'is_today'    => $is_today,
             'any_locked'  => $any_locked,
-            'parts'       => $this->partModel->getActive(),     // entry table (new)
-            'products'    => $this->productModel->getActiveGrouped(),  // pullout dropdown still uses products
+            'parts'       => $this->partModel->getActive(),
+            'part_stock'  => $part_stock,
+            'products'    => $this->productModel->getActiveGrouped(),
             'product_map' => $this->productModel->getActiveAsMap(),
             'kiosks'      => Auth::isOwner() ? $this->kioskModel->getActive() : [],
             'history'     => $this->deliveryModel->getRecordedDates($kiosk_id),

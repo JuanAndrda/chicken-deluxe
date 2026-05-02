@@ -10,7 +10,9 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <h1><?= APP_NAME ?></h1>
+                <img src="<?= BASE_URL ?>/assets/img/graphics/Logo.png"
+                     alt="<?= APP_NAME ?>"
+                     class="login-logo">
                 <p>Inventory & Sales Monitoring System</p>
             </div>
 
