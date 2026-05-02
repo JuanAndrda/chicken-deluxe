@@ -5,7 +5,7 @@
 > **Group:** Group 7 — BSIT 2-B
 > **Database:** `chicken_deluxe` (MySQL / MariaDB, master-slave replication)
 > **Source files:** [`sql/schema.sql`](sql/schema.sql), [`sql/triggers.sql`](sql/triggers.sql)
-> **Last updated:** April 2026
+> **Last updated:** May 2026
 
 ---
 
@@ -42,7 +42,7 @@ After all the tables, the document covers SQL triggers, indexes, foreign keys, r
 
 # PART 1 — TABLE REFERENCE
 
-The database has **11 tables**, listed in the order they appear in `schema.sql`.
+The database has **13 tables**, listed in the order they appear in `schema.sql`.
 
 ---
 
@@ -136,9 +136,42 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 
 ---
 
+## TABLE 5A — `Part` *(added April 2026 — parts-based inventory)*
+
+- **Purpose:** Stores raw ingredient parts (Burger Bun, Patty, Cheese Slice, etc.) used to make finished Products. Inventory, Delivery, and the recipe system all track Parts instead of Products.
+- **Used By:** Process **B** (Inventory), **C** (Delivery), **E** (Reference Data).
+- **ERD Status:** 🆕 **NEW TABLE** — added April 2026 when the system migrated from product-based to parts-based inventory tracking.
+
+| Column Name | Data Type | Constraints | Description | Why It Matters |
+|-------------|-----------|-------------|-------------|----------------|
+| `Part_ID` | INT | PK, AUTO_INCREMENT | Unique number identifying each part | FK on Inventory_Snapshot, Delivery, Product_Part |
+| `Name` | VARCHAR(100) | NOT NULL, UNIQUE | Part name (e.g. "Burger Bun") | UNIQUE prevents duplicate part definitions |
+| `Unit` | VARCHAR(30) | NOT NULL | Unit of measurement (pcs / cup / pack / bottle / kg / g / ml) | Makes inventory counts meaningful ("50 pcs" vs "50 kg") |
+| `Active` | TINYINT(1) | NOT NULL, DEFAULT 1 | Soft-delete flag. 1 = in use, 0 = retired | Lets the Owner retire a part without losing historical records |
+| `Created_at` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Date and time this part was first added | — |
+
+---
+
+## TABLE 5B — `Product_Part` *(added April 2026 — recipe junction)*
+
+- **Purpose:** Defines how many of each Part are needed to make one unit of a Product. This is the "recipe" junction table that allows sales to auto-deduct parts from inventory.
+- **Used By:** Process **B** (Inventory — running stock calculation), **D** (Sales — parts deduction).
+- **ERD Status:** 🆕 **NEW TABLE** — added April 2026.
+
+| Column Name | Data Type | Constraints | Description | Why It Matters |
+|-------------|-----------|-------------|-------------|----------------|
+| `Product_Part_ID` | INT | PK, AUTO_INCREMENT | Unique number for each recipe row | — |
+| `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` ON DELETE CASCADE | The product this recipe belongs to | Cascade delete means removing a product cleans up its recipe |
+| `Part_ID` | INT | NOT NULL, FK → `Part(Part_ID)` ON DELETE RESTRICT | The part used in the recipe | RESTRICT prevents deleting a part that is still used in a recipe |
+| `Quantity_needed` | INT | NOT NULL | How many units of this part are needed to make 1 unit of the product | Used by `getRunningPartsInventory()` to compute parts consumed by sales |
+
+**Special key:** `UNIQUE (Product_ID, Part_ID)` — one row per part per product; prevents duplicate recipe entries.
+
+---
+
 ## TABLE 6 — `Inventory_Snapshot`
 
-- **Purpose:** Stores the daily stock count for every product at every kiosk. Each business day produces two rounds per product: a `beginning` snapshot (morning) and an `ending` snapshot (close of day). This is the heart of the inventory module.
+- **Purpose:** Stores the daily stock count for every **part** at every kiosk (new rows) and — for historical data only — every product (legacy rows). Each business day produces two rounds per part: a 'beginning' snapshot (morning) and an 'ending' snapshot (close of day).
 - **Used By:** Process **B** (Inventory) and Process **F** (Daily Summary report).
 - **ERD Status:** ⚠️ **MODIFIED** — same columns as the ERD, but with a new UNIQUE KEY constraint added.
 - **Why it was changed:** Without `uq_snapshot`, a staff member could accidentally record "beginning stock" twice for the same product on the same day, which would silently corrupt the daily report. The unique key makes the database itself reject the duplicate.
@@ -147,7 +180,8 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 |-------------|-----------|-------------|-------------|----------------|
 | `Inventory_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each snapshot row | — |
 | `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk this stock count is for | Lets staff see only their kiosk; lets reports filter by kiosk |
-| `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` | The product being counted | — |
+| `Product_ID` | INT | **NULL allowed**, FK → `Product(Product_ID)` | Legacy column — kept for historical product-based rows only. NULL for all new parts-based rows | **NULLable since April 2026.** New rows use Part_ID instead |
+| `Part_ID` | INT | **NULL allowed**, FK → `Part(Part_ID)` | The part being counted — **primary column for all new rows** | NULL for historical product-based rows only. One of Product_ID or Part_ID must be non-NULL |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The user who recorded this count | Audit trail — we always know who entered the number |
 | `Locked_status` | TINYINT(1) | NOT NULL, DEFAULT 0 | Whether this snapshot is locked. 1 = locked, 0 = still editable | **Core lock-out mechanism.** Once 1, only the Owner can flip it back to 0, and the trigger logs that unlock to the audit log |
 | `Snapshot_date` | DATE | NOT NULL | The business day this snapshot is for | Used by the daily report query |
@@ -155,13 +189,13 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | `Quantity` | INT | NOT NULL, DEFAULT 0 | The actual quantity on hand | The reason the row exists |
 | `Recorded_at` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Exact timestamp when this row was saved | — |
 
-**Special key:** `UNIQUE KEY uq_snapshot (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type)` — prevents duplicate snapshots.
+**Special keys:** `UNIQUE KEY uq_snapshot (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type)` for legacy rows; `UNIQUE KEY uq_snapshot_part (Kiosk_ID, Part_ID, Snapshot_date, Snapshot_type)` for parts-based rows.
 
 ---
 
 ## TABLE 7 — `Delivery`
 
-- **Purpose:** Records every stock delivery that arrives at a kiosk (e.g. supplier dropping off 50 burger patties). Feeds the daily inventory reconciliation report.
+- **Purpose:** Records every stock delivery or pullout at a kiosk. New rows are parts-based (Part_ID); legacy rows used Product_ID. Feeds the daily inventory reconciliation.
 - **Used By:** Process **C** (Delivery) and Process **F** (Reports).
 - **ERD Status:** ⚠️ **MODIFIED** — added `Locked_status` column.
 - **Why it was changed:** The ERD didn't include a lock flag for deliveries, but the same business rule that protects past sales should protect past deliveries — once locked, they cannot be silently rewritten.
@@ -171,9 +205,12 @@ The database has **11 tables**, listed in the order they appear in `schema.sql`.
 | `Delivery_ID` | INT | PK, AUTO_INCREMENT | Unique number that identifies each delivery row | — |
 | `Kiosk_ID` | INT | NOT NULL, FK → `Kiosk(Kiosk_ID)` | The kiosk that received the delivery | — |
 | `User_ID` | INT | NOT NULL, FK → `User(User_ID)` | The user who recorded the delivery | Audit trail |
-| `Product_ID` | INT | NOT NULL, FK → `Product(Product_ID)` | Which product was delivered | — |
+| `Product_ID` | INT | **NULL allowed**, FK → `Product(Product_ID)` | Legacy column — kept for historical product-based rows only. NULL for all new parts-based rows | **NULLable since April 2026.** |
+| `Part_ID` | INT | **NULL allowed**, FK → `Part(Part_ID)` | The part delivered or pulled out — **primary column for new rows** | NULL for legacy rows only |
 | `Delivery_Date` | DATE | NOT NULL | The day the delivery arrived | Used by the daily report query |
 | `Quantity` | INT | NOT NULL, DEFAULT 0 | How many units were delivered | The reason the row exists |
+| `Type` | VARCHAR(20) | NOT NULL, DEFAULT 'Delivery' | Whether this row is incoming stock ('Delivery') or stock removed ('Pullout') | 'Pullout' rows subtract from running inventory (expired, returned to supplier, etc.) |
+| `Notes` | VARCHAR(255) | NULL allowed | Reason or description for a pullout | Free text — e.g. "Expired", "Returned to supplier" |
 | `Locked_status` | TINYINT(1) | NOT NULL, DEFAULT 0 | Whether this delivery is locked. 1 = locked, 0 = still editable | **NEW vs ERD.** Same lock model as Sales — protects past data from accidental edits |
 | `Created_at` | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Exact timestamp when this row was saved | — |
 
@@ -545,6 +582,8 @@ END$$
 | Table | Key Name | Columns | Purpose |
 |-------|----------|---------|---------|
 | `Inventory_Snapshot` | `uq_snapshot` (UNIQUE) | (Kiosk_ID, Product_ID, Snapshot_date, Snapshot_type) | Prevents duplicate beginning/ending snapshots for the same kiosk + product + date |
+| `Inventory_Snapshot` | `uq_snapshot_part` (UNIQUE) | (Kiosk_ID, Part_ID, Snapshot_date, Snapshot_type) | Prevents duplicate parts-based beginning/ending snapshots |
+| `Product_Part` | (UNIQUE) | (Product_ID, Part_ID) | One row per part per product in the recipe |
 | `User` | (UNIQUE on Username) | Username | Two users can't share a login name |
 | `Role` | (UNIQUE on Name) | Name | Two roles can't share a name |
 | `Category` | (UNIQUE on Name) | Name | Two categories can't share a name |
@@ -574,6 +613,10 @@ The ERD only showed relationships as lines. The actual database enforces them wi
 | `Audit_Log` | `User_ID` | `User(User_ID)` |
 | `Time_in` | `User_ID` | `User(User_ID)` |
 | `Time_in` | `Kiosk_ID` | `Kiosk(Kiosk_ID)` |
+| `Product_Part` | `Product_ID` | `Product(Product_ID)` |
+| `Product_Part` | `Part_ID` | `Part(Part_ID)` |
+| `Inventory_Snapshot` | `Part_ID` | `Part(Part_ID)` |
+| `Delivery` | `Part_ID` | `Part(Part_ID)` |
 
 ## 3.4 Stored Procedures and Views
 
@@ -657,11 +700,18 @@ Every new or different item from the original ERD, in one place:
 |-----------|------|----------------|---------|
 | `Category` | New table | (its own) | Group products into menu categories |
 | `Time_in` | New table | (its own) | Track staff attendance per kiosk |
+| `Part` | New table | (its own) | Raw ingredient parts used to build Products; the unit of measurement for all new inventory and delivery rows |
+| `Product_Part` | New table | (its own) | Recipe junction — how many of each Part are needed to make 1 unit of a Product; drives parts-consumed calculation in `getRunningPartsInventory()` |
 | `Kiosk.Name` / `Location` / `Active` | Modified columns | `Kiosk` | Replaced wrong ERD columns with proper kiosk fields |
 | `Category_ID` | New column | `Product` | Link each product to its category |
 | `Price` | New column | `Product` | Official selling price; used by server on every sale (anti-tampering) |
 | `Full_name` | New column | `User` | Display name for UI and audit log |
 | `Locked_status` | New column | `Delivery` | Allow Owner to lock past delivery rows |
+| `Part_ID` | New column | `Delivery` | Parts-based delivery tracking (April 2026); `Product_ID` is now NULLable for legacy rows |
+| `Type` | New column | `Delivery` | Distinguishes 'Delivery' (incoming) from 'Pullout' (removed) rows |
+| `Notes` | New column | `Delivery` | Free-text reason for a pullout |
+| `Part_ID` | New column | `Inventory_Snapshot` | Parts-based snapshot tracking (April 2026); `Product_ID` is now NULLable for legacy rows |
+| `uq_snapshot_part` | Unique key | `Inventory_Snapshot` | Prevent duplicate parts-based beginning/ending snapshots |
 | `Locked_status` | New column | `Expenses` | Allow Owner to lock past expense rows |
 | `Details` | New column | `Audit_Log` | Human-readable description of audited action |
 | `Operation` | New column | `Audit_Log` | INSERT / UPDATE / DELETE — populated by change-logging triggers |
@@ -688,4 +738,4 @@ Every new or different item from the original ERD, in one place:
 
 ---
 
-*End of DATABASE_FULL_DOCUMENTATION.md — Group 7, BSIT 2-B, April 2026*
+*End of DATABASE_FULL_DOCUMENTATION.md — Group 7, BSIT 2-B, May 2026*

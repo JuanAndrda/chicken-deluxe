@@ -308,10 +308,10 @@ The system covers 5 kiosk kiosks:
 
 ## 10. TECH STACK
 
-- **Language:** Java (preferred based on developer background)
-- **UI:** Java Swing or Web (TBD)
+- **Language:** PHP (MVC web application)
+- **UI:** Web (PHP views, HTML/CSS/JS)
 - **Database:** MySQL / MariaDB via XAMPP (master-slave replication setup)
-- **IDE:** IntelliJ IDEA or VS Code
+- **IDE:** VS Code
 - **Version Control:** Git
 
 ---
@@ -338,17 +338,17 @@ The project uses **MySQL master-slave replication** configured inside XAMPP on a
 - All schema changes (CREATE TABLE, ALTER TABLE, etc.) go to **Master only**
 
 ### Connection Config Pattern
-```java
-// Master connection — for all writes
-Connection masterConn = DriverManager.getConnection(
-    "jdbc:mysql://localhost:3306/chicken_deluxe",  // Master port
-    "master_user", "password"
+```php
+// core/Database.php — Master connection (all writes)
+$this->master = new PDO(
+    'mysql:host=127.0.0.1;port=3306;dbname=chicken_deluxe;charset=utf8mb4',
+    'root', ''
 );
 
-// Slave connection — for all reads
-Connection slaveConn = DriverManager.getConnection(
-    "jdbc:mysql://localhost:3307/chicken_deluxe",  // Slave port (different port on same machine)
-    "slave_user", "password"
+// core/Database.php — Slave connection (all reads)
+$this->slave = new PDO(
+    'mysql:host=127.0.0.1;port=3307;dbname=chicken_deluxe;charset=utf8mb4',
+    'root', ''
 );
 ```
 > ⚠️ Check the actual ports in the XAMPP config files — they may differ from the example above. Always read the existing config before assuming port numbers.
@@ -376,15 +376,11 @@ read_only = 1
 ```
 
 ### Query Routing Logic
-```java
-// Route based on operation type
-public Connection getConnection(String operationType) {
-    if (operationType.equals("READ")) {
-        return slaveConn;   // SELECT queries → Slave
-    } else {
-        return masterConn;  // INSERT/UPDATE/DELETE → Master
-    }
-}
+```php
+// core/Database.php
+public function read(string $sql, array $params = []): array  { /* → Slave */ }
+public function write(string $sql, array $params = []): int   { /* → Master */ }
+public function insert(string $sql, array $params = []): int  { /* → Master */ }
 ```
 
 ---
@@ -510,7 +506,7 @@ WHERE TRIGGER_SCHEMA = 'chicken_deluxe';
 
 ---
 
-*Last updated: April 2026 (UI/UX pass for Inventory & Reports — tab layouts, sticky submit, pagination; followed by perpetual-inventory + cart-POS + tab redesign + demo seed pass) — Group 7, BSIT 2-B*
+*Last updated: May 2026 (UI/UX pass for Inventory & Reports — tab layouts, sticky submit, pagination; followed by perpetual-inventory + cart-POS + tab redesign + demo seed pass) — delivery stock column; logo image in login/sidebar — Group 7, BSIT 2-B*
 
 ---
 
@@ -530,6 +526,8 @@ These were added on top of the schema described above. **No schema changes** —
 | **Admin / Audit Log** | Date-range + action-type filters, quick-filter pills (Today / Week / 30 Days), expandable OLD vs NEW JSON diff panels per row, server-side pagination (20/page), deterministic `Timestamp DESC, Log_ID DESC` ordering. |
 | **Dashboard** | Role-aware: Owner sees multi-kiosk stat cards + status grid; Staff sees own-kiosk progress + contextual "what's next" callout; Auditor sees minimal landing. |
 | **Layout polish** | Login auto-stores `kiosk_name` in session; sidebar shows 📍 kiosk badge for staff; navbar shows full name (not just username). |
+| **Delivery stock display** | "Select Part" table on the Delivery page now shows a **Stock** column with the current running inventory (pcs) per part — computed as `beginning + delivered − pulled_out − used_by_sales` via `InventoryModel::getRunningPartsInventory()`. Shows `—` if no beginning snapshot exists for the day. `DeliveryController` now depends on `InventoryModel`. |
+| **Logo image** | `assets/img/graphics/Logo.png` added. Login page header and sidebar header now display the logo image instead of the plain `APP_NAME` text. CSS classes `.login-logo` and `.sidebar-logo` set `width:100%` so the logo fills the container. |
 
 ### Demo / reset SQL scripts
 

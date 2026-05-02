@@ -14,6 +14,10 @@
 
 Every item below is **fully implemented, lint-clean, and live** on the master DB:
 
+**May 2026 additions (this pass)**
+- **Delivery page stock column** — `DeliveryController` now loads `InventoryModel::getRunningPartsInventory()` and passes `part_stock` (Part_ID → Running_Qty map) to the view; the "Select Part" table shows a live **Stock** column per part
+- **Logo image** — `assets/img/graphics/Logo.png` added and wired into login header and sidebar header; replaces plain `APP_NAME` text; CSS fills container width
+
 **New features**
 - **Perpetual inventory** — today's `beginning` auto-carries from yesterday's `ending`; new `/inventory/auto-generate` route + green ✓ carry-forward indicators + live "running inventory" widget (`beginning + delivered − sold`)
 - **Cart-based POS for Sales** — staff build a multi-product order, then submit it atomically via `/sales/store-batch` (new `SalesModel::createBatch()` wraps the whole order in one transaction)
@@ -34,7 +38,7 @@ Every item below is **fully implemented, lint-clean, and live** on the master DB
 | `DeliveryModel` | `updateQuantity()` |
 | `ExpenseModel` | `update()` |
 | `SalesModel` | `createBatch()`, `getDailyTotalByKiosk()` |
-| `InventoryModel` | `getPreviousDayEnding()`, `autoGenerateBeginning()`, `getRunningInventory()`, `getKioskInventoryStatus()` |
+| `InventoryModel` | `getPreviousDayEnding()`, `autoGenerateBeginning()`, `getRunningInventory()`, `getKioskInventoryStatus()`, `getRunningPartsInventory()`, `getKioskPartsInventoryStatus()`, `hasPartsBeginningToday()`, `hasPartsEndingToday()`, `createPartsSnapshots()`, `getPreviousDayEndingParts()`, `autoGeneratePartsBeginning()` |
 | `AuditLogModel` | `getAll()` extended with date/action filters + pagination, new `countAll()` |
 
 **Controllers extended**
@@ -42,7 +46,7 @@ Every item below is **fully implemented, lint-clean, and live** on the master DB
 |---|---|
 | `AdminController` | `editUser()` + `updateUser()` + `resetUserPassword()`; `users()` and `kiosks()` honor `?show_all=1`; `auditLog()` gets filtering + pagination |
 | `SalesController` | `storeBatch()` for atomic cart submit |
-| `DeliveryController` | `update()` |
+| `DeliveryController` | `update()`, `pullout()`, `createPartDelivery()` paths; now depends on `InventoryModel` for part stock; passes `part_stock` map to view |
 | `ExpenseController` | `update()` |
 | `InventoryController` | `autoGenerateBeginning()` |
 | `DashboardController` | Rewritten with `buildOwnerData/buildStaffData/buildAuditorData` |
@@ -417,4 +421,4 @@ These areas are grader-ready and should not be touched:
 
 ---
 
-*PROJECT_CHECKLIST.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026*
+*PROJECT_CHECKLIST.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026 — May 2026: delivery stock column, logo image*

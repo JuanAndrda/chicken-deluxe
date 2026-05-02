@@ -100,9 +100,9 @@ A **model** is a class that knows everything about *one specific topic* in the s
 
 - **`ProductModel.php`** — Manages the menu items the kiosks sell — names, units, prices, photos, and active status. The point-of-sale screens lean heavily on this model to display what's available.
 
-- **`InventoryModel.php`** — The most important model in the system. It records the daily snapshots of stock — what was on hand at the start of the day (`beginning`) and what was left at the end (`ending`). It also locks records when the day ends and unlocks them when the owner says so. Now also supports **perpetual inventory**: `getPreviousDayEnding()` reads the prior day's ending stock, `autoGenerateBeginning()` creates today's beginning rows in one click using yesterday's ending values (carry-forward), `getRunningInventory()` computes live "beginning + delivered − sold" per product so staff can see what should be on hand right now, and `getKioskInventoryStatus()` powers the dashboard's per-kiosk readiness widget.
+- **`InventoryModel.php`** — The most important model in the system. It records the daily snapshots of stock — what was on hand at the start of the day (`beginning`) and what was left at the end (`ending`). It also locks records when the day ends and unlocks them when the owner says so. Now also supports **perpetual inventory**: `getPreviousDayEnding()` reads the prior day's ending stock, `autoGenerateBeginning()` creates today's beginning rows in one click using yesterday's ending values (carry-forward), `getRunningInventory()` computes live "beginning + delivered − sold" per product so staff can see what should be on hand right now, and `getKioskInventoryStatus()` powers the dashboard's per-kiosk readiness widget. Parts-based equivalents added in April 2026: `getRunningPartsInventory()` computes `beginning + delivered − pulled_out − used_by_sales` per **part** (not product) — this is now the active inventory formula and also powers the Stock column on the Delivery page.
 
-- **`DeliveryModel.php`** — Records when fresh stock arrives at a kiosk. Each delivery is tied to a kiosk, a staff member, a product, and a date. `updateQuantity()` lets the Owner edit an unlocked delivery's quantity (rejected at the DB level if the row is already locked).
+- **`DeliveryModel.php`** — Records when fresh stock arrives at a kiosk. Each delivery is tied to a kiosk, a staff member, a product, and a date. `updateQuantity()` lets the Owner edit an unlocked delivery's quantity (rejected at the DB level if the row is already locked). `getPartsByDateAndKiosk()` fetches part-based delivery rows. `createPartDelivery()` and `createPartPullout()` are the active insert paths for new rows. `updateQuantity()` lets the Owner edit an unlocked delivery inline.
 
 - **`SalesModel.php`** — Records every sale. Each row is "this kiosk sold this product, this many units, at this price, on this date." The total amount is calculated automatically by a database trigger (more on that later). `createBatch()` writes a whole POS cart in one transaction so a 6-item order is either fully saved or fully rolled back. `getDailyTotalByKiosk()` powers the Owner dashboard's per-kiosk day totals.
 
@@ -134,7 +134,7 @@ A **controller** is the middleman between what the user wants and what the syste
 
 - **`InventoryController.php`** — Handles the daily inventory pages: showing today's snapshot, accepting beginning and ending stock entries, and (for the Owner) unlocking past records. Adds `autoGenerateBeginning()` for the perpetual-inventory carry-forward — staff click one button and today's beginning rows are created from yesterday's ending values, audit-logged.
 
-- **`DeliveryController.php`** — Handles delivery entry pages: showing what was delivered today, accepting new delivery records, and locking past delivery days. Adds `update()` so the Owner can correct an unlocked delivery's quantity without deleting and re-creating the row.
+- **`DeliveryController.php`** — Handles delivery entry pages: showing what was delivered today, accepting new delivery records, and locking past delivery days. Adds `update()` so the Owner can correct an unlocked delivery's quantity without deleting and re-creating the row. Now also depends on `InventoryModel` to load the current running stock per part, which it passes to the view as `part_stock` so the "Select Part" table shows live pcs.
 
 - **`SalesController.php`** — The point-of-sale screen. Lists all products with photos and prices, accepts quantities sold, and saves everything to the Sales table. The original `store()` method handles single-row writes; the new `storeBatch()` handles the cart-based POS flow — a whole order (multiple products + quantities) is submitted in one POST and saved atomically through `SalesModel::createBatch()`.
 
@@ -163,11 +163,11 @@ A **controller** is the middleman between what the user wants and what the syste
 - **`layouts/`** — The shared shell every page uses, so we don't repeat the navigation bar and header on every screen.
   - **`main.php`** — The HTML wrapper (the `<head>`, `<body>`, footer). Every other view is "wrapped" by this file.
   - **`navbar.php`** — The top bar with the logo and the user's full name (now uses `Auth::fullName()` instead of just the username).
-  - **`sidebar.php`** — The left-side menu that changes depending on the user's role (Owner sees more options, Staff sees less). Staff users now see a 📍 **kiosk badge** at the bottom showing which branch they're assigned to (uses `$_SESSION['kiosk_name']` cached at login).
+  - **`sidebar.php`** — The left-side menu that changes depending on the user's role (Owner sees more options, Staff sees less). Displays the **Logo.png** brand image in the header instead of the plain app name text (`.sidebar-logo` fills the container width). Staff users also see a 📍 **kiosk badge** at the bottom showing which branch they're assigned to (uses `$_SESSION['kiosk_name']` cached at login).
   - **`modal.php`** — A single hidden confirm-dialog overlay that gets included once by `main.php` and is then driven by the `showConfirmModal()` helper in `assets/js/app.js`. Every Lock / Unlock / Delete / Save button across the app calls into it instead of using the browser's native `confirm()` — keeps the styling consistent and lets the modal show colour-coded confirm buttons (red for delete, blue for unlock, green for lock).
 
 - **`auth/`** — Login screen.
-  - **`login.php`** — The username/password form. The only page accessible without being logged in.
+  - **`login.php`** — The username/password form. The only page accessible without being logged in. Displays the **Logo.png** brand image at the top of the card (`.login-logo` fills the card width).
 
 - **`dashboard/`** — Home page after login.
   - **`index.php`** — Now **role-aware**. Owner sees a multi-kiosk overview with stat cards (today's sales, units sold, etc.) and a kiosk-status grid showing which branches have started/closed their day. Staff sees a focused "your kiosk today" view with progress meters (beginning stock recorded? deliveries logged? etc.) and a contextual action callout that tells them the next thing to do. Auditor sees a minimal read-only landing.
@@ -176,7 +176,7 @@ A **controller** is the middleman between what the user wants and what the syste
   - **`index.php`** — Tablet-friendly daily entry screen. Products are split into **category sub-tabs** (Burgers, Drinks, Hotdogs, Ricebowl, Snacks) so staff don't scroll a flat list. Each row has finger-sized **+/− buttons**, a live **progress bar** ("X of 33 filled"), and a **sticky Save bar** anchored to the bottom of the screen. Now also shows the **perpetual inventory** features: a green ✓ "carry-forward" badge when today's beginning stock came from yesterday's ending, an "Auto-generate beginning" card that copies the previous day's ending values in one click, and a live **Running Inventory** widget computing `beginning + delivered − sold` per product so staff can see what's left right now.
 
 - **`delivery/`** — Delivery module screens.
-  - **`index.php`** — **Tab-based layout** (`Add Delivery` + `Delivery Records (N)`). Add tab shows the full-width product grid with category pills; tapping a card slides a compact entry panel in **above** the grid (no horizontal scrolling). Records tab shows the records table with a Total Units indicator, Lock All button (Owner), and inline Edit rows for unlocked records. Auto-jumps to the Records tab right after a successful add. A **Recent Deliveries** quick-link card appears above the tabs.
+  - **`index.php`** — **Tab-based layout** (`Add Delivery` + `Delivery Records (N)`). Add tab shows the full-width product grid with category pills; tapping a card slides a compact entry panel in **above** the grid (no horizontal scrolling). Records tab shows the records table with a Total Units indicator, Lock All button (Owner), and inline Edit rows for unlocked records. Auto-jumps to the Records tab right after a successful add. A **Recent Deliveries** quick-link card appears above the tabs. The Select Part table has a **Stock** column showing the current running inventory in pcs for each part (pulled from `part_stock` computed by `DeliveryController`). Shows `—` when no beginning snapshot has been recorded yet.
 
 - **`sales/`** — Point-of-sale screen.
   - **`index.php`** — **Tab-based POS** (`New Order` + `Sales Records (N)`). New Order tab is a 65/35 split: full-width product grid on the left, persistent order cart on the right. Tapping a product adds it to the cart with a green qty badge on the card; cart shows live unit count and grand total, with +/-/× line controls. Confirm Order submits the whole cart in one transaction via `/sales/store-batch`. Records tab shows the day's sales with a Day Total strip, totals row at the bottom, Lock All (Owner), Delete/Unlock actions, and a 🧾 empty-state card with a "New Order" shortcut.
@@ -215,6 +215,8 @@ A **controller** is the middleman between what the user wants and what the syste
 - **`js/app.js`** — The JavaScript that adds interactivity: form validation hints, table pagination on the products page, confirmation dialogs.
 
 - **`img/products/`** — The actual product photos shown in the point-of-sale grid. Photos are organized by category subfolder (`Burgers/`, `Drinks/`, `Hotdogs/`, `Ricebowl/`, `Snacks/`) and the system automatically figures out which file matches each product name.
+
+- **`img/graphics/`** — brand graphics. Currently contains `Logo.png`, the brand logo displayed on the login page header and the sidebar header.
 
 ---
 
@@ -410,4 +412,4 @@ If you ever get lost, come back to this document and find the right folder for t
 
 ---
 
-*PROJECT_STRUCTURE_EXPLAINED.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026*
+*PROJECT_STRUCTURE_EXPLAINED.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026; May 2026 — delivery stock column, logo image*

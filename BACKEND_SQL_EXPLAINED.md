@@ -17,7 +17,7 @@
 
 1. [Master-Slave Replication](#1-master-slave-replication)
 2. [How PHP Connects to Master vs Slave](#2-how-php-connects-to-master-vs-slave)
-3. [SQL Queries Used in the System](#3-sql-queries-used-in-the-system)
+3. [SQL Queries Used in the System](#3-sql-queries-used-in-the-system) (3.1–3.8)
 4. [SQL Triggers](#4-sql-triggers)
 5. [Putting It All Together — One Real Request](#5-putting-it-all-together--one-real-request)
 
@@ -474,7 +474,55 @@ ORDER  BY c.Name, p.Name;
 2. **`COALESCE(..., 0)`** handles products that have a beginning snapshot but no deliveries or no sales yet — without it the math would be `15 + NULL − NULL = NULL`.
 3. **`Snapshot_type = 'beginning'`** — note the lowercase enum value. Our column uses MySQL's `ENUM('beginning','ending')` so the database itself rejects typos like `'Begining'`.
 
-### 3.7 Subqueries — the rubric §1.4 highlights
+### 3.7 Parts-based running inventory — `getRunningPartsInventory`
+
+**Where:** `models/InventoryModel.php` → `getRunningPartsInventory()`
+
+This is the **active inventory formula** used since April 2026. It is the parts-based equivalent of `getRunningInventory()` and now also powers the **Stock column on the Delivery page**:
+
+```sql
+SELECT
+    pt.Part_ID,
+    pt.Name                              AS Part_Name,
+    pt.Unit,
+    COALESCE(beg.Quantity, 0)            AS Beginning_Qty,
+    COALESCE(d.delivered, 0)             AS Delivered_Qty,
+    COALESCE(po.pulled_out, 0)           AS Pullout_Qty,
+    COALESCE(consumed.used_qty, 0)       AS Used_Qty,
+    (COALESCE(beg.Quantity, 0)
+     + COALESCE(d.delivered, 0)
+     - COALESCE(po.pulled_out, 0)
+     - COALESCE(consumed.used_qty, 0))   AS Running_Qty
+FROM Part pt
+INNER JOIN Inventory_Snapshot beg
+       ON beg.Part_ID = pt.Part_ID AND beg.Kiosk_ID = ?
+      AND beg.Snapshot_date = ? AND beg.Snapshot_type = 'beginning'
+LEFT JOIN (SELECT Part_ID, SUM(Quantity) AS delivered
+           FROM Delivery WHERE Kiosk_ID=? AND Delivery_Date=?
+             AND Part_ID IS NOT NULL AND Type='Delivery'
+           GROUP BY Part_ID) d ON d.Part_ID = pt.Part_ID
+LEFT JOIN (SELECT Part_ID, SUM(Quantity) AS pulled_out
+           FROM Delivery WHERE Kiosk_ID=? AND Delivery_Date=?
+             AND Part_ID IS NOT NULL AND Type='Pullout'
+           GROUP BY Part_ID) po ON po.Part_ID = pt.Part_ID
+LEFT JOIN (SELECT pp.Part_ID,
+                  SUM(s.Quantity_sold * pp.Quantity_needed) AS used_qty
+           FROM Sales s JOIN Product_Part pp ON s.Product_ID = pp.Product_ID
+           WHERE s.Kiosk_ID=? AND s.Sales_date=?
+           GROUP BY pp.Part_ID) consumed ON consumed.Part_ID = pt.Part_ID
+WHERE pt.Active = 1
+ORDER BY pt.Name
+```
+
+**Key differences from `getRunningInventory()`:**
+- Joins `Part` not `Product` — tracks ingredients, not finished menu items
+- Splits Delivery by `Type`: `'Delivery'` adds stock, `'Pullout'` removes it
+- Consumption uses `Product_Part.Quantity_needed` to convert sales into parts used
+- `DeliveryController` calls this to build `part_stock` (Part_ID → Running_Qty map), passed to the view so the Select Part table shows live stock
+
+---
+
+### 3.8 Subqueries — the rubric §1.4 highlights
 
 **Where:** `models/ReportModel.php` → `getProductsAboveAverageSales()`
 
@@ -822,4 +870,4 @@ That's defense in depth — bypass any one of those layers and there are still o
 ---
 
 *Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B*
-*Systems Analysis & Design + Information Management*
+*Systems Analysis & Design + Information Management — May 2026*
