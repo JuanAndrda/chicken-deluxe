@@ -105,19 +105,27 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Time</th>
                                             <th>Staff Name</th>
                                             <th>Username</th>
                                             <th>Kiosk</th>
+                                            <th>Time In</th>
+                                            <th>Time Out</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($rows as $r): ?>
                                             <tr>
-                                                <td><?= date('g:i A', strtotime($r['Timestamp'])) ?></td>
                                                 <td><?= htmlspecialchars($r['Full_name']) ?></td>
                                                 <td><?= htmlspecialchars($r['Username']) ?></td>
                                                 <td><?= htmlspecialchars($r['Kiosk_Name']) ?></td>
+                                                <td><?= date('g:i A', strtotime($r['Timestamp'])) ?></td>
+                                                <td>
+                                                    <?php if (!empty($r['Time_out'])): ?>
+                                                        <?= date('g:i A', strtotime($r['Time_out'])) ?>
+                                                    <?php else: ?>
+                                                        <span class="text-light">— still active</span>
+                                                    <?php endif; ?>
+                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>

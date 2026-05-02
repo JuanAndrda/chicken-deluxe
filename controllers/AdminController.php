@@ -9,7 +9,6 @@ require_once __DIR__ . '/../models/KioskModel.php';
 require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/CategoryModel.php';
 require_once __DIR__ . '/../models/AuditLogModel.php';
-require_once __DIR__ . '/../models/TimeInModel.php';
 require_once __DIR__ . '/../models/PartModel.php';
 
 class AdminController extends Controller
@@ -20,7 +19,6 @@ class AdminController extends Controller
     private ProductModel $productModel;
     private CategoryModel $categoryModel;
     private AuditLogModel $auditLog;
-    private TimeInModel $timeInModel;
 
     public function __construct()
     {
@@ -30,7 +28,6 @@ class AdminController extends Controller
         $this->productModel  = new ProductModel();
         $this->categoryModel = new CategoryModel();
         $this->auditLog      = new AuditLogModel();
-        $this->timeInModel   = new TimeInModel();
     }
 
     // ============================
@@ -46,15 +43,13 @@ class AdminController extends Controller
         $show_all = (bool) $this->get('show_all', 0);
 
         $data = [
-            'page_title'        => 'Manage Users',
-            'users'             => $show_all ? $this->userModel->getAll() : $this->userModel->getAllActive(),
-            'roles'             => $this->roleModel->getAll(),
-            'kiosks'            => $this->kioskModel->getActive(),
-            'show_all'          => $show_all,
-            'active_sessions'   => $this->timeInModel->getActiveToday(),
-            'completed_sessions'=> $this->timeInModel->getCompletedToday(),
-            'success'           => $_GET['success'] ?? null,
-            'error'             => $_GET['error'] ?? null,
+            'page_title' => 'Manage Users',
+            'users'      => $show_all ? $this->userModel->getAll() : $this->userModel->getAllActive(),
+            'roles'      => $this->roleModel->getAll(),
+            'kiosks'     => $this->kioskModel->getActive(),
+            'show_all'   => $show_all,
+            'success'    => $_GET['success'] ?? null,
+            'error'      => $_GET['error'] ?? null,
         ];
 
         $this->render('admin/users', $data);
@@ -220,31 +215,6 @@ class AdminController extends Controller
         $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Deactivated user ID:{$user_id}");
 
         $this->redirect('/admin/users?success=User+deactivated');
-    }
-
-    /** Record time-out for an active session */
-    public function timeout(): void
-    {
-        Auth::requireRole([ROLE_OWNER]);
-
-        if (!Auth::validateCsrf()) {
-            $this->redirect('/admin/users?error=Invalid+request');
-            return;
-        }
-
-        $timein_id = (int) $this->post('timein_id');
-        if ($timein_id <= 0) {
-            $this->redirect('/admin/users?error=Invalid+session');
-            return;
-        }
-
-        $updated = $this->timeInModel->recordTimeOut($timein_id);
-        if ($updated) {
-            $this->auditLog->log(Auth::userId(), ACTION_UPDATE, "Recorded time-out for session ID:{$timein_id}");
-            $this->redirect('/admin/users?success=Time-out+recorded');
-        } else {
-            $this->redirect('/admin/users?error=Could+not+record+time-out+(already+timed+out?)');
-        }
     }
 
     /** Handle reactivate user */

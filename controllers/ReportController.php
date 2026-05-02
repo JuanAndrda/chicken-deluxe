@@ -131,7 +131,8 @@ class ReportController extends Controller
         $from_date = $this->get('from_date', date('Y-m-d'));
         $to_date   = $this->get('to_date', date('Y-m-d'));
 
-        $records = $this->timeInModel->getByDateRange($from_date, $to_date, $kiosk_id);
+        // Use the full model method so the Time_out column comes through
+        $records = $this->timeInModel->getFullByDateRange($from_date, $to_date, $kiosk_id);
 
         $data = [
             'page_title'  => 'Staff Time-In',

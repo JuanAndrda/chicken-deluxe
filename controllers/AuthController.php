@@ -84,11 +84,18 @@ class AuthController extends Controller
         $this->redirect('/dashboard');
     }
 
-    /** Handle logout */
+    /** Handle logout — also auto-closes any open Time_in row for staff */
     public function logout(): void
     {
         if (Auth::check()) {
-            $this->auditLog->log(Auth::userId(), ACTION_LOGOUT, 'User logged out');
+            $user_id = Auth::userId();
+
+            // Auto time-out for staff: close any open session for today
+            if (Auth::isStaff() && $user_id) {
+                $this->timeInModel->recordTimeOutForUser($user_id);
+            }
+
+            $this->auditLog->log($user_id, ACTION_LOGOUT, 'User logged out');
         }
         Auth::logout();
         $this->redirect('/login');

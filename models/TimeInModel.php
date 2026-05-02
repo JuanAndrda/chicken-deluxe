@@ -76,7 +76,7 @@ class TimeInModel extends Model
         );
     }
 
-    /** Record time-out for a session */
+    /** Record time-out for a single session (by Timein_ID) */
     public function recordTimeOut(int $timein_id): int
     {
         return $this->db->write(
@@ -84,5 +84,39 @@ class TimeInModel extends Model
              WHERE Timein_ID = ? AND Time_out IS NULL",
             [$timein_id]
         );
+    }
+
+    /**
+     * Close ALL open sessions for a user today.
+     * Used by AuthController on logout — staff time-out is automatic
+     * (driven by the logout action, no manual button needed).
+     */
+    public function recordTimeOutForUser(int $user_id): int
+    {
+        return $this->db->write(
+            "UPDATE Time_in SET Time_out = NOW()
+             WHERE User_ID = ?
+               AND DATE(Timestamp) = CURDATE()
+               AND Time_out IS NULL",
+            [$user_id]
+        );
+    }
+
+    /** Get every recorded session in a date range (with optional kiosk filter) */
+    public function getFullByDateRange(string $from_date, string $to_date, ?int $kiosk_id = null): array
+    {
+        $sql = "SELECT t.Timein_ID, t.User_ID, t.Kiosk_ID, t.Timestamp, t.Time_out,
+                       u.Full_name, u.Username, k.Name AS Kiosk_Name
+                FROM Time_in t
+                JOIN User u ON t.User_ID = u.User_ID
+                JOIN Kiosk k ON t.Kiosk_ID = k.Kiosk_ID
+                WHERE DATE(t.Timestamp) BETWEEN ? AND ?";
+        $params = [$from_date, $to_date];
+        if ($kiosk_id !== null) {
+            $sql .= " AND t.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
+        }
+        $sql .= " ORDER BY t.Timestamp DESC";
+        return $this->db->read($sql, $params);
     }
 }
