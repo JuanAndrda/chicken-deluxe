@@ -20,6 +20,14 @@
         <img src="<?= BASE_URL ?>/assets/img/graphics/Logo.png"
              alt="<?= APP_NAME ?>"
              class="sidebar-logo">
+        <div class="sidebar-meta">
+            <?php if (Auth::isStaff() && Auth::kioskId()): ?>
+                <span class="sidebar-meta-branch">
+                    &#128205; <?= htmlspecialchars($_SESSION['kiosk_name'] ?? 'Kiosk ' . Auth::kioskId()) ?>
+                </span>
+            <?php endif; ?>
+            <span class="sidebar-meta-clock" id="sidebarClock"></span>
+        </div>
     </div>
 
     <nav class="sidebar-nav">
@@ -45,14 +53,4 @@
         <?php endif; ?>
     </nav>
 
-    <div class="sidebar-footer">
-        <span class="sidebar-user"><?= htmlspecialchars(Auth::fullName() ?? '') ?></span>
-        <span class="sidebar-role"><?= ROLE_NAMES[Auth::roleId()] ?? '' ?></span>
-        <?php if (Auth::isStaff() && Auth::kioskId()): ?>
-            <span class="sidebar-kiosk">
-                &#128205;
-                <?= htmlspecialchars($_SESSION['kiosk_name'] ?? 'Kiosk ' . Auth::kioskId()) ?>
-            </span>
-        <?php endif; ?>
-    </div>
 </aside>

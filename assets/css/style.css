@@ -10,8 +10,8 @@
 }
 
 :root {
-    --primary: #e63946;
-    --primary-dark: #c1121f;
+    --primary:  #f89443;
+    --primary-dark: #c1773b;
     --secondary: #457b9d;
     --accent: #f4a261;
     --bg: #f8f9fa;
@@ -204,8 +204,8 @@ a:hover {
 /* -- Sidebar -- */
 .sidebar {
     width: var(--sidebar-width);
-    background: var(--text);
-    color: #fff;
+    background: rgb(237, 236, 236);
+    color: black;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -235,13 +235,13 @@ a:hover {
 .nav-link {
     display: block;
     padding: 12px 20px;
-    color: rgba(255,255,255,0.8);
+    color: black;
     font-size: 0.95rem;
     transition: background 0.2s;
 }
 .nav-link:hover {
     background: rgba(255,255,255,0.1);
-    color: #fff;
+    color: orange;
     text-decoration: none;
 }
 .nav-link.active {
@@ -253,33 +253,40 @@ a:hover {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(255,255,255,0.45);
+    color: black;
     margin-top: 8px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid black;
 }
 .nav-link.nav-sub {
     padding-left: 32px;
     font-size: 0.9rem;
 }
 
-.sidebar-footer {
-    padding: 16px 20px;
-    border-top: 1px solid rgba(255,255,255,0.1);
+.sidebar-meta {
+    padding: 8px 0 4px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
 }
-.sidebar-user {
+.sidebar-meta-branch {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sidebar-meta-clock {
+    font-size: 0.85rem;
     font-weight: 600;
-    font-size: 0.9rem;
-}
-.sidebar-role {
-    font-size: 0.8rem;
     color: var(--accent);
+    letter-spacing: 0.03em;
 }
 
 /* -- Navbar -- */
 .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
     height: var(--navbar-height);
     background: var(--bg-white);
     border-bottom: 1px solid var(--border);
@@ -1217,7 +1224,7 @@ tr:hover {
     background: var(--primary);
     transition: width 0.3s ease;
 }
-.kiosk-bar-fill-expense { background: #c62828; }
+.kiosk-bar-fill-expense { background: orange; }
 
 /* Pagination (shared across report tables) */
 .report-pagination {
@@ -1326,7 +1333,7 @@ tr:hover {
 .perpetual-option {
     background: #f0f7ff;
     border: 1px solid #bbdefb;
-    border-left: 4px solid var(--primary, #e63946);
+    border-left: 4px solid var(--primary, orange);
     border-radius: 8px;
     padding: 16px 20px;
     margin-bottom: 12px;
@@ -1345,7 +1352,7 @@ tr:hover {
 }
 .perpetual-option-header h4 { margin: 0; font-size: 16px; }
 .perpetual-badge {
-    background: var(--primary, #e63946);
+    background: var(--primary, orange);
     color: #fff;
     font-size: 11px;
     font-weight: 700;
@@ -1420,7 +1427,7 @@ tr:hover {
     border-radius: 12px;
     background: #f5f5f5;
 }
-.running-stat-neg  { background: #ffebee; color: #c62828; }
+.running-stat-neg  { background: #ffebee; color: orange; }
 .running-stat-zero { background: #fff3e0; color: #ef6c00; }
 .running-stat-low  { background: #fffde7; color: #f9a825; }
 .running-inventory-formula {
@@ -1446,7 +1453,7 @@ tr:hover {
 }
 .running-op { color: #999; font-weight: 700; }
 .running-delivered { color: #2e7d32; font-weight: 700; }
-.running-sold      { color: #c62828; font-weight: 700; }
+.running-sold      { color: orange; font-weight: 700; }
 .running-qty-final {
     font-size: 18px;
     font-weight: 800;
@@ -1455,7 +1462,7 @@ tr:hover {
     text-align: right;
 }
 .running-row-zero     .running-qty-final { color: #ef6c00; }
-.running-row-negative .running-qty-final { color: #c62828; }
+.running-row-negative .running-qty-final { color: orange; }
 
 /* Ending pre-fill notice */
 .ending-prefill-notice {
@@ -1729,18 +1736,6 @@ tr:hover {
 .audit-page-btn:hover:not(.active) { background: #f5f5f5; }
 .audit-page-btn.disabled { opacity: 0.4; pointer-events: none; }
 
-/* ============================================================
-   SIDEBAR — staff kiosk badge
-   ============================================================ */
-.sidebar-kiosk {
-    font-size: 11px;
-    color: rgba(255,255,255,0.55);
-    margin-top: 3px;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
 /* ================================
    ADMIN PAGES (Users / Kiosks / Products edit affordances)
@@ -2173,11 +2168,11 @@ tr:hover {
 }
 .delivery-tab-btn:hover  { color: #333; }
 .delivery-tab-btn.active {
-    color: #C62828;
-    border-bottom-color: #C62828;
+    color: orange;
+    border-bottom-color: orange;
 }
 .delivery-tab-badge {
-    background: #C62828;
+    background: orange;
     color: white;
     border-radius: 10px;
     padding: 1px 7px;
@@ -2339,11 +2334,11 @@ tr:hover {
 }
 .sales-tab-btn:hover  { color: #333; }
 .sales-tab-btn.active {
-    color: #C62828;
-    border-bottom-color: #C62828;
+    color: orange;
+    border-bottom-color: orange;
 }
 .sales-tab-badge {
-    background: #C62828;
+    background: orange;
     color: white;
     border-radius: 10px;
     padding: 1px 8px;
@@ -2564,8 +2559,8 @@ tr:hover {
 }
 .inventory-step-btn:hover  { color: #333; }
 .inventory-step-btn.active {
-    color: #C62828;
-    border-bottom-color: #C62828;
+    color: orange;
+    border-bottom-color: orange;
 }
 .inventory-step-num {
     display: inline-flex;
@@ -2581,7 +2576,7 @@ tr:hover {
     flex-shrink: 0;
 }
 .inventory-step-btn.active .inventory-step-num {
-    background: #C62828;
+    background: orange;
 }
 .inventory-step-label {
     white-space: nowrap;
@@ -2607,7 +2602,7 @@ tr:hover {
 }
 .step-badge-warn {
     background: #FFEBEE;
-    color: #C62828;
+    color: orange;
 }
 .step-badge-empty {
     background: #f0f0f0;
@@ -2685,7 +2680,7 @@ tr:hover {
 }
 .pos-stock-none {
     background: #FFEBEE;
-    color: #C62828;
+    color: orange;
 }
 .pos-unavailable {
     opacity: 0.45;
@@ -2958,7 +2953,7 @@ tr:hover {
     align-items: center;
     gap: 8px;
     padding: 9px 18px;
-    background: var(--primary, #E63946);
+    background: var(--primary, orange);
     color: #fff;
     font-weight: 600;
     font-size: 14px;
@@ -3010,7 +3005,7 @@ tr:hover {
     user-select: none;
 }
 .add-recipe-summary::-webkit-details-marker { display: none; }
-.add-recipe-summary:hover { color: var(--primary, #E63946); }
+.add-recipe-summary:hover { color: var(--primary, orange); }
 .add-recipe-summary .text-muted { font-weight: 400; font-size: 12px; }
 
 .add-recipe-details[open] > .add-recipe-summary::before { content: '▾ '; }
@@ -3052,5 +3047,5 @@ tr:hover {
     transform: translateY(0);
 }
 .pos-toast-warn { background: #E65100; }
-.pos-toast-err  { background: #C62828; }
+.pos-toast-err  { background: orange; }
 .pos-toast-ok   { background: #2E7D32; }

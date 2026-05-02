@@ -3,6 +3,28 @@
  */
 
 /* ------------------------------------------------------------------
+   SIDEBAR LIVE CLOCK
+   Updates #sidebarClock every second with the current local time.
+------------------------------------------------------------------ */
+(function () {
+    const clockEl = document.getElementById('sidebarClock');
+    if (!clockEl) return;
+
+    function tick() {
+        const now  = new Date();
+        let   h    = now.getHours();
+        const m    = String(now.getMinutes()).padStart(2, '0');
+        const s    = String(now.getSeconds()).padStart(2, '0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        clockEl.textContent = `${h}:${m}:${s} ${ampm}`;
+    }
+
+    tick();
+    setInterval(tick, 1000);
+})();
+
+/* ------------------------------------------------------------------
  * showConfirmModal(options)
  *
  * Drop-in replacement for native window.confirm(). Drives the single
