@@ -42,13 +42,13 @@ class ReportController extends Controller
 
         $report = $this->reportModel->getDailySummary($date, $kiosk_id);
 
-        // Calculate totals
-        $total_sales = 0;
+        // Total sales come from a separate query (per-part rows have no peso total).
+        $total_sales = $this->reportModel->getDailyTotalSales($kiosk_id, $date);
         $has_discrepancy = false;
         foreach ($report as $row) {
-            $total_sales += $row['Sales_Total'];
             if ($row['Discrepancy'] !== 0) {
                 $has_discrepancy = true;
+                break;
             }
         }
 

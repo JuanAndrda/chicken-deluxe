@@ -4,85 +4,114 @@
  */
 class ReportModel extends Model
 {
-    /** Daily summary for a single kiosk on a specific date */
+    /**
+     * Daily summary for a single kiosk on a specific date.
+     *
+     * REWRITTEN 2026-05 — was joining Inventory_Snapshot.Product_ID and
+     * Delivery.Product_ID, both of which are always NULL in the parts-based
+     * system, so the report always returned an empty array. Now driven by
+     * Part_ID and Sales x Product_Part recipe consumption — same formula
+     * as InventoryModel::getRunningPartsInventory.
+     *
+     * Output keys are kept compatible with the existing daily.php view
+     * (`Product_Name` actually carries the part name, `Category_Name` is a
+     * fixed 'Parts' label since parts have no category). `Sales_Total` is
+     * 0 per row — sales totals are per-product, not per-part; the kiosk's
+     * total sales for the day is shown in the page header via
+     * getDailyTotalSales().
+     */
     public function getDailySummary(string $date, int $kiosk_id): array
     {
-        // Beginning stock
-        $beginning = $this->db->read(
-            "SELECT i.Product_ID, p.Name AS Product_Name, c.Name AS Category_Name, p.Unit,
-                    i.Quantity AS Beginning_Qty
-             FROM Inventory_Snapshot i
-             JOIN Product p ON i.Product_ID = p.Product_ID
-             JOIN Category c ON p.Category_ID = c.Category_ID
-             WHERE i.Kiosk_ID = ? AND i.Snapshot_date = ? AND i.Snapshot_type = 'beginning'
-             ORDER BY c.Name, p.Name",
-            [$kiosk_id, $date]
+        $rows = $this->db->read(
+            "SELECT
+                pt.Part_ID,
+                pt.Name                              AS Part_Name,
+                pt.Unit,
+                COALESCE(beg.Quantity, 0)            AS Beginning_Qty,
+                COALESCE(end_s.Quantity, 0)          AS Ending_Qty,
+                COALESCE(d.delivered, 0)             AS Delivered_Qty,
+                COALESCE(po.pulled_out, 0)           AS Pullout_Qty,
+                COALESCE(consumed.used_qty, 0)       AS Used_Qty
+             FROM Part pt
+             LEFT JOIN Inventory_Snapshot beg
+                    ON beg.Part_ID = pt.Part_ID AND beg.Kiosk_ID = ?
+                   AND beg.Snapshot_date = ? AND beg.Snapshot_type = 'beginning'
+             LEFT JOIN Inventory_Snapshot end_s
+                    ON end_s.Part_ID = pt.Part_ID AND end_s.Kiosk_ID = ?
+                   AND end_s.Snapshot_date = ? AND end_s.Snapshot_type = 'ending'
+             LEFT JOIN (
+                    SELECT Part_ID, SUM(Quantity) AS delivered
+                    FROM   Delivery
+                    WHERE  Kiosk_ID = ? AND Delivery_Date = ?
+                      AND  Part_ID IS NOT NULL AND Type = 'Delivery'
+                    GROUP  BY Part_ID
+                ) d ON d.Part_ID = pt.Part_ID
+             LEFT JOIN (
+                    SELECT Part_ID, SUM(Quantity) AS pulled_out
+                    FROM   Delivery
+                    WHERE  Kiosk_ID = ? AND Delivery_Date = ?
+                      AND  Part_ID IS NOT NULL AND Type = 'Pullout'
+                    GROUP  BY Part_ID
+                ) po ON po.Part_ID = pt.Part_ID
+             LEFT JOIN (
+                    SELECT pp.Part_ID,
+                           SUM(s.Quantity_sold * pp.Quantity_needed) AS used_qty
+                    FROM   Sales s
+                    JOIN   Product_Part pp ON s.Product_ID = pp.Product_ID
+                    WHERE  s.Kiosk_ID = ? AND s.Sales_date = ?
+                    GROUP  BY pp.Part_ID
+                ) consumed ON consumed.Part_ID = pt.Part_ID
+             WHERE pt.Active = 1
+               AND (beg.Quantity IS NOT NULL
+                    OR end_s.Quantity IS NOT NULL
+                    OR d.delivered IS NOT NULL
+                    OR po.pulled_out IS NOT NULL
+                    OR consumed.used_qty IS NOT NULL)
+             ORDER BY pt.Name",
+            [$kiosk_id, $date, $kiosk_id, $date,
+             $kiosk_id, $date, $kiosk_id, $date, $kiosk_id, $date]
         );
 
-        // Ending stock
-        $ending = $this->db->read(
-            "SELECT Product_ID, Quantity AS Ending_Qty
-             FROM Inventory_Snapshot
-             WHERE Kiosk_ID = ? AND Snapshot_date = ? AND Snapshot_type = 'ending'",
-            [$kiosk_id, $date]
-        );
-        $ending_map = [];
-        foreach ($ending as $e) {
-            $ending_map[$e['Product_ID']] = $e['Ending_Qty'];
-        }
-
-        // Deliveries
-        $deliveries = $this->db->read(
-            "SELECT Product_ID, SUM(Quantity) AS Delivered_Qty
-             FROM Delivery
-             WHERE Kiosk_ID = ? AND Delivery_Date = ?
-             GROUP BY Product_ID",
-            [$kiosk_id, $date]
-        );
-        $delivery_map = [];
-        foreach ($deliveries as $d) {
-            $delivery_map[$d['Product_ID']] = $d['Delivered_Qty'];
-        }
-
-        // Sales
-        $sales = $this->db->read(
-            "SELECT Product_ID, SUM(Quantity_sold) AS Sold_Qty, SUM(Line_total) AS Sales_Total
-             FROM Sales
-             WHERE Kiosk_ID = ? AND Sales_date = ?
-             GROUP BY Product_ID",
-            [$kiosk_id, $date]
-        );
-        $sales_map = [];
-        foreach ($sales as $s) {
-            $sales_map[$s['Product_ID']] = $s;
-        }
-
-        // Combine into a single report
         $report = [];
-        foreach ($beginning as $row) {
-            $pid = $row['Product_ID'];
-            $beg = (int) $row['Beginning_Qty'];
-            $del = (int) ($delivery_map[$pid] ?? 0);
-            $sold = (int) ($sales_map[$pid]['Sold_Qty'] ?? 0);
-            $end = (int) ($ending_map[$pid] ?? 0);
-            $expected = $beg + $del - $sold;
-            $discrepancy = $end - $expected;
+        foreach ($rows as $r) {
+            $beg      = (int) $r['Beginning_Qty'];
+            $del      = (int) $r['Delivered_Qty'];
+            $pull     = (int) $r['Pullout_Qty'];
+            $used     = (int) $r['Used_Qty'];
+            $end      = (int) $r['Ending_Qty'];
+            $expected = $beg + $del - $pull - $used;
+            // Discrepancy is only meaningful once an ending snapshot exists.
+            $disc = $end > 0 ? ($end - $expected) : 0;
 
             $report[] = [
-                'Product_Name'  => $row['Product_Name'],
-                'Category_Name' => $row['Category_Name'],
-                'Unit'          => $row['Unit'],
+                // View-compat keys (Product_Name carries the part name)
+                'Product_Name'  => $r['Part_Name'],
+                'Category_Name' => 'Parts',
+                'Unit'          => $r['Unit'],
                 'Beginning_Qty' => $beg,
                 'Delivered_Qty' => $del,
-                'Sold_Qty'      => $sold,
-                'Sales_Total'   => (float) ($sales_map[$pid]['Sales_Total'] ?? 0),
+                'Pullout_Qty'   => $pull,
+                'Used_Qty'      => $used,
+                'Sold_Qty'      => $used, // alias: parts "sold" == parts consumed by sales
+                'Sales_Total'   => 0.0,   // per-part has no peso total; see getDailyTotalSales()
                 'Ending_Qty'    => $end,
                 'Expected_Qty'  => $expected,
-                'Discrepancy'   => $discrepancy,
+                'Discrepancy'   => $disc,
             ];
         }
-
         return $report;
+    }
+
+    /** Kiosk's total peso sales for a given day (used by daily report header) */
+    public function getDailyTotalSales(int $kiosk_id, string $date): float
+    {
+        $row = $this->db->readOne(
+            "SELECT COALESCE(SUM(Line_total), 0) AS Total
+             FROM   Sales
+             WHERE  Kiosk_ID = ? AND Sales_date = ?",
+            [$kiosk_id, $date]
+        );
+        return (float) ($row['Total'] ?? 0);
     }
 
     /** Get sales totals per kiosk for a date range */
@@ -163,17 +192,29 @@ class ReportModel extends Model
         return $this->db->read($sql, $params);
     }
 
-    /** Get delivery summary for a date range and optional kiosk */
+    /**
+     * Get delivery summary for a date range and optional kiosk.
+     *
+     * REWRITTEN 2026-05 — was joining Delivery.Product_ID = Product.Product_ID,
+     * which is always NULL post-parts-migration, so this returned 0 rows. Now
+     * joins Delivery.Part_ID = Part.Part_ID and groups by part.
+     *
+     * View-compat note: result keeps the column name `Product_Name` (carrying
+     * the part name) and a fixed 'Parts' Category_Name so consolidated.php
+     * doesn't need a rewrite. `Type` ('Delivery' or 'Pullout') is included so
+     * the report can distinguish incoming stock from pullouts.
+     */
     public function getDeliverySummary(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
         $sql = "SELECT d.Delivery_Date, k.Name AS Kiosk_Name,
-                       p.Name AS Product_Name, c.Name AS Category_Name,
+                       pt.Name AS Product_Name, 'Parts' AS Category_Name,
+                       d.Type,
                        SUM(d.Quantity) AS Total_Qty
                 FROM Delivery d
                 JOIN Kiosk k ON d.Kiosk_ID = k.Kiosk_ID
-                JOIN Product p ON d.Product_ID = p.Product_ID
-                JOIN Category c ON p.Category_ID = c.Category_ID
-                WHERE d.Delivery_Date BETWEEN ? AND ?";
+                JOIN Part  pt ON d.Part_ID  = pt.Part_ID
+                WHERE d.Delivery_Date BETWEEN ? AND ?
+                  AND d.Part_ID IS NOT NULL";
         $params = [$from_date, $to_date];
 
         if ($kiosk_id !== null) {
@@ -181,8 +222,8 @@ class ReportModel extends Model
             $params[] = $kiosk_id;
         }
 
-        $sql .= " GROUP BY d.Delivery_Date, d.Kiosk_ID, d.Product_ID
-                   ORDER BY d.Delivery_Date DESC, k.Name, c.Name, p.Name";
+        $sql .= " GROUP BY d.Delivery_Date, d.Kiosk_ID, d.Part_ID, d.Type
+                   ORDER BY d.Delivery_Date DESC, k.Name, pt.Name, d.Type";
 
         return $this->db->read($sql, $params);
     }

@@ -85,13 +85,12 @@
             <table id="dailyReportTable">
                 <thead>
                     <tr>
-                        <th>Category</th>
-                        <th>Product</th>
+                        <th>Part</th>
                         <th>Unit</th>
                         <th>Beginning</th>
                         <th>Delivered</th>
-                        <th>Sold</th>
-                        <th>Sales (P)</th>
+                        <th>Pulled Out</th>
+                        <th>Used by Sales</th>
                         <th>Ending</th>
                         <th>Expected</th>
                         <th>Discrepancy</th>
@@ -99,19 +98,18 @@
                 </thead>
                 <tbody>
                     <?php if (empty($report)): ?>
-                        <tr><td colspan="10" class="text-center">No data for this date. Make sure beginning stock has been recorded.</td></tr>
+                        <tr><td colspan="9" class="text-center">No data for this date. Make sure beginning stock has been recorded.</td></tr>
                     <?php else: ?>
                         <?php foreach ($report as $row): ?>
                             <tr class="report-row <?= $row['Discrepancy'] !== 0 ? 'row-warning' : '' ?>"
                                 data-category="<?= htmlspecialchars($row['Category_Name']) ?>"
-                                data-sales="<?= (float) $row['Sales_Total'] ?>">
-                                <td><?= htmlspecialchars($row['Category_Name']) ?></td>
+                                data-sales="0">
                                 <td><?= htmlspecialchars($row['Product_Name']) ?></td>
                                 <td><?= htmlspecialchars($row['Unit']) ?></td>
                                 <td><?= $row['Beginning_Qty'] ?></td>
                                 <td><?= $row['Delivered_Qty'] ?></td>
-                                <td><?= $row['Sold_Qty'] ?></td>
-                                <td>P<?= number_format($row['Sales_Total'], 2) ?></td>
+                                <td><?= $row['Pullout_Qty'] ?? 0 ?></td>
+                                <td><?= $row['Used_Qty'] ?? $row['Sold_Qty'] ?></td>
                                 <td><?= $row['Ending_Qty'] ?></td>
                                 <td><?= $row['Expected_Qty'] ?></td>
                                 <td>
@@ -125,11 +123,6 @@
                                 </td>
                             </tr>
                         <?php endforeach; ?>
-                        <!-- Totals row (kept inside <tbody>; JS keeps it pinned to the visible bottom) -->
-                        <tr class="report-totals-row" id="dailyTotalsRow">
-                            <td colspan="6" class="text-right"><strong>Total Sales (visible)</strong></td>
-                            <td colspan="4"><strong>P<span id="dailyTotalsValue">0.00</span></strong></td>
-                        </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -144,7 +137,8 @@
 
         <?php if (!empty($report)): ?>
             <p class="report-note">
-                Expected = Beginning + Delivered &minus; Sold. Discrepancy = Ending &minus; Expected.
+                Expected = Beginning + Delivered &minus; Pulled Out &minus; Used by Sales.
+                Discrepancy = Ending &minus; Expected (only computed when an ending snapshot exists).
                 Negative = stock shortage, Positive = excess.
             </p>
         <?php endif; ?>

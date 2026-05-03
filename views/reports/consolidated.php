@@ -243,18 +243,23 @@
                         <tr>
                             <th>Date</th>
                             <th>Kiosk</th>
-                            <th>Product</th>
-                            <th>Category</th>
+                            <th>Part</th>
+                            <th>Type</th>
                             <th>Total Qty</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($deliveries as $del): ?>
+                            <?php $is_pullout = ($del['Type'] ?? 'Delivery') === 'Pullout'; ?>
                             <tr>
                                 <td><?= date('M j, Y', strtotime($del['Delivery_Date'])) ?></td>
                                 <td><?= htmlspecialchars($del['Kiosk_Name']) ?></td>
                                 <td><?= htmlspecialchars($del['Product_Name']) ?></td>
-                                <td><span class="badge badge-category"><?= htmlspecialchars($del['Category_Name']) ?></span></td>
+                                <td>
+                                    <span class="badge <?= $is_pullout ? 'badge-pullout' : 'badge-delivery' ?>">
+                                        <?= htmlspecialchars($del['Type'] ?? 'Delivery') ?>
+                                    </span>
+                                </td>
                                 <td><strong><?= $del['Total_Qty'] ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
