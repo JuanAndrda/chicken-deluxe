@@ -53,6 +53,7 @@ $router->post('/inventory/store', 'InventoryController', 'store');
 $router->post('/inventory/auto-generate', 'InventoryController', 'autoGenerateBeginning');
 $router->post('/inventory/unlock', 'InventoryController', 'unlock');
 $router->post('/inventory/lock',    'InventoryController', 'lock');
+$router->post('/inventory/update',  'InventoryController', 'update');
 
 // -- Delivery routes --
 $router->get('/delivery',          'DeliveryController', 'index');

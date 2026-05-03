@@ -194,11 +194,28 @@
             <div class="inventory-saved-view inventory-flat">
                 <h4 class="inventory-flat-heading">All Parts (<?= count($beginning) ?>)</h4>
                 <?php foreach ($beginning as $row): ?>
-                    <?php $show_locked = $staff_locked || $row['Locked_status']; ?>
+                    <?php
+                        $show_locked = $staff_locked || $row['Locked_status'];
+                        $can_edit    = Auth::isOwner() && !$row['Locked_status'];
+                    ?>
                     <div class="inventory-product-row">
                         <div class="inventory-product-name"><?= htmlspecialchars($row['Part_Name']) ?></div>
                         <div class="inventory-product-unit"><?= htmlspecialchars($row['Unit']) ?></div>
-                        <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
+                        <div class="inventory-saved-qty">
+                            <?php if ($can_edit): ?>
+                                <form method="POST" action="<?= BASE_URL ?>/inventory/update" class="inventory-edit-form">
+                                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                    <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                    <input type="hidden" name="date" value="<?= $date ?>">
+                                    <input type="number" name="quantity" min="0"
+                                           value="<?= $row['Quantity'] ?>"
+                                           class="form-input inventory-edit-input">
+                                    <button type="submit" class="btn btn-sm btn-primary" title="Save">✓</button>
+                                </form>
+                            <?php else: ?>
+                                <?= $row['Quantity'] ?>
+                            <?php endif; ?>
+                        </div>
                         <div class="inventory-saved-status">
                             <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
                                 <?= $show_locked ? 'Locked' : 'Open' ?>
@@ -432,6 +449,7 @@
                         $show_locked = $staff_locked || $row['Locked_status'];
                         $beg_qty     = $beginning_qty_map[(int) $row['Part_ID']] ?? null;
                         $is_warn     = $beg_qty !== null && (int) $row['Quantity'] > $beg_qty;
+                        $can_edit    = Auth::isOwner() && !$row['Locked_status'];
                     ?>
                     <div class="inventory-product-row<?= $is_warn ? ' inventory-row-warning' : '' ?>">
                         <div class="inventory-product-name"><?= htmlspecialchars($row['Part_Name']) ?></div>
@@ -439,7 +457,21 @@
                         <?php if ($beg_qty !== null): ?>
                             <div class="inventory-ending-ref">Beginning: <strong><?= $beg_qty ?></strong></div>
                         <?php endif; ?>
-                        <div class="inventory-saved-qty"><?= $row['Quantity'] ?></div>
+                        <div class="inventory-saved-qty">
+                            <?php if ($can_edit): ?>
+                                <form method="POST" action="<?= BASE_URL ?>/inventory/update" class="inventory-edit-form">
+                                    <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                    <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                    <input type="hidden" name="date" value="<?= $date ?>">
+                                    <input type="number" name="quantity" min="0"
+                                           value="<?= $row['Quantity'] ?>"
+                                           class="form-input inventory-edit-input">
+                                    <button type="submit" class="btn btn-sm btn-primary" title="Save">✓</button>
+                                </form>
+                            <?php else: ?>
+                                <?= $row['Quantity'] ?>
+                            <?php endif; ?>
+                        </div>
                         <div class="inventory-saved-status">
                             <span class="badge <?= $show_locked ? 'badge-locked' : 'badge-active' ?>">
                                 <?= $show_locked ? 'Locked' : 'Open' ?>

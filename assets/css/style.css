@@ -1121,6 +1121,21 @@ tr:hover {
 .inventory-saved-status { margin: 0 12px; }
 .inventory-saved-action { margin-left: auto; }
 
+/* Inline edit form inside .inventory-saved-qty when Owner + unlocked */
+.inventory-edit-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+.inventory-edit-input {
+    width: 70px;
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+}
+
 /* ======================== REPORT VIEWS ======================== */
 
 /* Discrepancy banner (Daily report) */

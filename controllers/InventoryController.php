@@ -248,6 +248,39 @@ class InventoryController extends Controller
         $this->redirect("/inventory?date={$date}&success=Record+unlocked");
     }
 
+    /** Update an unlocked snapshot's quantity (Owner only) */
+    public function update(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/inventory?error=Invalid+request');
+            return;
+        }
+
+        $inventory_id = (int) $this->post('inventory_id');
+        $quantity     = (int) $this->post('quantity');
+        $date         = $this->post('date', date('Y-m-d'));
+
+        if ($inventory_id <= 0) {
+            $this->redirect("/inventory?date={$date}&error=Missing+record+ID");
+            return;
+        }
+        if ($quantity < 0) {
+            $this->redirect("/inventory?date={$date}&error=Quantity+cannot+be+negative");
+            return;
+        }
+
+        $rows = $this->inventoryModel->updateQuantity($inventory_id, $quantity);
+        if ($rows > 0) {
+            $this->auditLog->log(Auth::userId(), ACTION_UPDATE,
+                "Updated Inventory_Snapshot ID:{$inventory_id} quantity to {$quantity}");
+            $this->redirect("/inventory?date={$date}&success=Quantity+updated");
+        } else {
+            $this->redirect("/inventory?date={$date}&error=Cannot+update+a+locked+record");
+        }
+    }
+
     /** Determine which kiosk to use (staff=assigned, owner=selected or first) */
     private function resolveKiosk(): int
     {
