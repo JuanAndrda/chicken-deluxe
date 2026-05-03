@@ -268,7 +268,25 @@ class DeliveryController extends Controller
             return;
         }
 
+        // Stock validation — pullout cannot exceed current running inventory.
+        // Same pattern as the POS shortage check (SalesController::storeBatch).
         if ($part_id > 0) {
+            $running = $this->inventoryModel->getRunningPartsInventory($date, $kiosk_id);
+            $available = 0;
+            $part_name = "Part#{$part_id}";
+            foreach ($running as $r) {
+                if ((int) $r['Part_ID'] === $part_id) {
+                    $available = (int) $r['Running_Qty'];
+                    $part_name = $r['Part_Name'];
+                    break;
+                }
+            }
+            if ($quantity > $available) {
+                $msg = "Cannot pull out {$quantity} of {$part_name} — only {$available} in stock";
+                $this->redirect("/delivery?date={$date}&kiosk_id={$kiosk_id}&error=" . urlencode($msg));
+                return;
+            }
+
             $delivery_id = $this->deliveryModel->createPartPullout($kiosk_id, Auth::userId(), $part_id, $date, $quantity, $notes);
             $this->auditLog->log(Auth::userId(), ACTION_CREATE, "Pullout ID:{$delivery_id} — part:{$part_id}, qty:{$quantity}");
         } else {

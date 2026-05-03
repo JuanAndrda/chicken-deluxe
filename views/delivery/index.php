@@ -242,15 +242,18 @@
                             <select id="pulloutPart" name="part_id" class="form-select" required>
                                 <option value="">— Select part —</option>
                                 <?php foreach ($parts as $p): ?>
-                                    <option value="<?= $p['Part_ID'] ?>">
+                                    <?php $stk = $part_stock[$p['Part_ID']] ?? 0; ?>
+                                    <option value="<?= $p['Part_ID'] ?>"
+                                            data-stock="<?= $stk ?>"
+                                            <?= $stk <= 0 ? 'disabled' : '' ?>>
                                         <?= htmlspecialchars($p['Name']) ?>
-                                        (<?= htmlspecialchars($p['Unit']) ?>)
+                                        (<?= htmlspecialchars($p['Unit']) ?>) — <?= $stk ?> in stock
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="form-group" style="flex:0 0 120px;">
-                            <label for="pulloutQty">Quantity</label>
+                        <div class="form-group" style="flex:0 0 140px;">
+                            <label for="pulloutQty">Quantity <span id="pulloutQtyHint" class="form-hint"></span></label>
                             <input type="number" id="pulloutQty" name="quantity"
                                    class="form-input" min="1" value="1" required>
                         </div>
@@ -542,5 +545,36 @@
         if (!panel) return;
         panel.style.display = panel.style.display === 'none' ? '' : 'none';
     };
+
+    // ============ PULLOUT STOCK GUARD ============
+    // Mirror the Qty input's max to the selected part's running stock so the
+    // browser blocks over-pulls before the form submits. Server-side check
+    // in DeliveryController::pullout() is the real safety net.
+    const pulloutPart = document.getElementById('pulloutPart');
+    const pulloutQty  = document.getElementById('pulloutQty');
+    const pulloutHint = document.getElementById('pulloutQtyHint');
+
+    if (pulloutPart && pulloutQty) {
+        function syncPulloutMax() {
+            const opt   = pulloutPart.options[pulloutPart.selectedIndex];
+            const stock = opt ? parseInt(opt.dataset.stock || '0', 10) : 0;
+            if (stock > 0) {
+                pulloutQty.max = stock;
+                if (parseInt(pulloutQty.value, 10) > stock) pulloutQty.value = stock;
+                if (pulloutHint) pulloutHint.textContent = '(max ' + stock + ')';
+            } else {
+                pulloutQty.removeAttribute('max');
+                if (pulloutHint) pulloutHint.textContent = '';
+            }
+        }
+        pulloutPart.addEventListener('change', syncPulloutMax);
+        // Snap value back into range as the user types
+        pulloutQty.addEventListener('input', function() {
+            const max = parseInt(pulloutQty.max || '0', 10);
+            const val = parseInt(pulloutQty.value || '0', 10);
+            if (max > 0 && val > max) pulloutQty.value = max;
+        });
+        syncPulloutMax();
+    }
 })();
 </script>
