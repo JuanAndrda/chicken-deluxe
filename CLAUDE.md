@@ -189,10 +189,12 @@ These must be enforced at the DB/model level, not just the UI:
 - All triggers live in `sql/triggers.sql`
 - Before adding a new trigger, run `SHOW TRIGGERS FROM chicken_deluxe;` to avoid duplicates
 - Triggers are only created on the **Master** — they replicate automatically
-- **28 triggers currently live** (see `DATABASE_FULL_DOCUMENTATION.md` Part 2 for the full list):
-  - **Business-rule (7):** `trg_calc_line_total_insert/update`, `trg_prevent_locked_sales/inventory/delivery/expense_edit`, `trg_audit_inventory_unlock`
-  - **Change-logging (21):** `trg_log_<table>_insert/update/delete` for Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk
-- ⚠️ **The change-logging triggers fire on every INSERT/UPDATE/DELETE** to those 7 tables and write a row to `Audit_Log`. Bulk seed/reset scripts should TRUNCATE Audit_Log at the end to avoid hundreds of trigger-noise rows — see `sql/demo_reset.sql` / `sql/demo_seed.sql` for the pattern.
+- **33 triggers currently live** (see `DATABASE_FULL_DOCUMENTATION.md` Part 2 for the full list):
+  - **Business-rule (6):** `trg_calc_line_total_insert/update`, `trg_prevent_locked_sales/inventory/delivery/expense_edit`
+  - **Change-logging (27):** `trg_log_<table>_insert/update/delete` for Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk, Part, Product_Part
+  - The Inventory_Snapshot and Delivery change-logging triggers include `Part_ID` (and Delivery also includes `Type` and `Notes`) in the JSON snapshot — fixed 2026-05 so audit rows are accurate for the parts-based system.
+  - Previously had `trg_audit_inventory_unlock` (dedicated unlock-event trigger). Removed 2026-05 — the generic `trg_log_inventory_snapshot_update` already captures every unlock with full Operation + Old_values + New_values.
+- ⚠️ **The change-logging triggers fire on every INSERT/UPDATE/DELETE** to those 9 tables and write a row to `Audit_Log`. Bulk seed/reset scripts should TRUNCATE Audit_Log at the end to avoid hundreds of trigger-noise rows — see `sql/demo_reset.sql` / `sql/demo_seed.sql` for the pattern.
 - TRUNCATE does **not** fire DML triggers in MySQL — useful for clean wipes.
 
 ---

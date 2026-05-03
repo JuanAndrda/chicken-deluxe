@@ -375,7 +375,7 @@ A **trigger** is an automatic rule the database runs on its own whenever a speci
 **Why use triggers instead of doing it in PHP code?**
 Because triggers can't be skipped. Even if a future programmer forgets to add the right calculation in the controller, or a developer connects directly to the database with a desktop tool and tries to make a change, the trigger still fires. It's the database's own immune system.
 
-The project has **7 active triggers**. Here they are in plain English:
+The project has **33 active triggers** (6 business-rule + 27 change-logging). Here are the 6 business-rule ones in plain English; the change-logging triggers are mechanical and documented in `DATABASE_FULL_DOCUMENTATION.md` Part 2:
 
 1. **`trg_calc_line_total_insert`** — Whenever a new sale row is inserted, this trigger automatically calculates `Quantity Sold × Unit Price` and stores the result in `Line_total`. The staff never has to do math, and they can't accidentally enter a wrong total.
 
@@ -389,9 +389,11 @@ The project has **7 active triggers**. Here they are in plain English:
 
 6. **`trg_prevent_locked_expense_edit`** — Same bouncer, but for the Expenses table. Frozen expense records cannot be touched.
 
-7. **`trg_audit_inventory_unlock`** — Whenever an inventory record's lock is *removed* (changed from `1` back to `0` by the owner), this trigger automatically writes a row in the Audit Log saying "this record was unlocked on this date by user X." The owner can never quietly unlock something — there's always a paper trail.
+**Notes on removed triggers:**
 
-**A note on the eighth trigger:** There used to be a `trg_auto_lock_inventory` that was supposed to lock all inventory rows when an "ending" snapshot was inserted. MySQL doesn't allow a trigger to update the same table that fired it (it would create an infinite loop), so we moved that logic into the PHP code (specifically `InventoryModel::createBatchSnapshots`). Same end result, just done in a different layer.
+- `trg_auto_lock_inventory` (originally planned) — was supposed to fire `AFTER INSERT ON Inventory_Snapshot` and lock all snapshots for that day when an `ending` snapshot was added. MySQL doesn't allow a trigger to update the same table that fired it (it would create an infinite loop), so we moved that logic into PHP code (specifically `InventoryModel::createBatchSnapshots`). Same end result, just done in a different layer.
+
+- `trg_audit_inventory_unlock` — used to log every inventory unlock as a `RECORD_UNLOCKED` row. Removed 2026-05 because the generic `trg_log_inventory_snapshot_update` (one of the change-logging triggers) already captures every unlock with full before/after JSON, making the dedicated trigger redundant noise.
 
 ---
 
@@ -412,4 +414,4 @@ If you ever get lost, come back to this document and find the right folder for t
 
 ---
 
-*PROJECT_STRUCTURE_EXPLAINED.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026; May 2026 — delivery stock column, logo image*
+*PROJECT_STRUCTURE_EXPLAINED.md — Chicken Deluxe Inventory & Sales Monitoring System — Group 7 — BSIT 2-B — 2026; May 2026 — delivery stock column, logo image; May 2026 — trigger audit fix*

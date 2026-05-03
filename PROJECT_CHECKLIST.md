@@ -119,9 +119,9 @@ Every item below is **fully implemented, lint-clean, and live** on the master DB
 | Log captures affected table | ✅ DONE | Dedicated `Table_name` column |
 | Log captures data changes (old + new) | ✅ DONE | `Old_values` and `New_values` TEXT columns holding JSON_OBJECT snapshots |
 | Log captures timestamp | ✅ DONE | `Timestamp` column with `DEFAULT CURRENT_TIMESTAMP` |
-| `SHOW TRIGGERS` shows active triggers | ✅ DONE | **28 triggers** confirmed active on Master (7 original + 21 new change-logging) |
+| `SHOW TRIGGERS` shows active triggers | ✅ DONE | **33 triggers** confirmed active on Master (6 business-rule + 27 change-logging — see DATABASE_FULL_DOCUMENTATION.md Part 2) |
 
-**Current 7 triggers (live on Master):**
+**Current 6 business-rule triggers (live on Master):**
 
 | Trigger | Event | Table | Purpose |
 |---|---|---|---|
@@ -131,10 +131,13 @@ Every item below is **fully implemented, lint-clean, and live** on the master DB
 | `trg_prevent_locked_inventory_edit` | BEFORE UPDATE | inventory_snapshot | Validation |
 | `trg_prevent_locked_delivery_edit` | BEFORE UPDATE | delivery | Validation |
 | `trg_prevent_locked_expense_edit` | BEFORE UPDATE | expenses | Validation |
-| `trg_audit_inventory_unlock` | AFTER UPDATE | inventory_snapshot | Logging (unlock only) |
+
+> `trg_audit_inventory_unlock` was removed 2026-05 — `trg_log_inventory_snapshot_update` already captures every unlock with full Old/New values, making the dedicated trigger redundant.
 
 **✅ RESOLVED (2026-04-20):**
 Expanded `Audit_Log` with `Operation`, `Table_name`, `Old_values`, `New_values` columns and added 21 `trg_log_*` triggers (AFTER INSERT/UPDATE/DELETE × 7 tables: Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk). Password column is deliberately excluded from User triggers. Verified with live insert/update/delete test on Product — Audit_Log rows 99, 100, 101 captured correct Operation / Table_name / JSON Old+New values. See `sql/migrations/2026_add_change_logging.sql`.
+
+**✅ ADDITIONAL FIX (2026-05-03):** Audit-trail accuracy fix in `sql/migrations/2026_05_fix_audit_triggers.sql`. The Inventory_Snapshot change-logging triggers now include `Part_ID` in the JSON snapshot (was only logging legacy `Product_ID` which is always NULL post-parts-migration). The Delivery triggers now include `Part_ID`, `Type` (Delivery/Pullout), and `Notes`. Added `trg_log_product_part_update` so recipe `Quantity_needed` edits are no longer silent. Removed `trg_audit_inventory_unlock` (redundant + half-empty). Smoke-tested live: a fresh `INSERT INTO Delivery (..., Part_ID=1, Type='Delivery', Notes='...')` now produces an Audit_Log row whose `New_values` JSON contains all three fields.
 
 ---
 

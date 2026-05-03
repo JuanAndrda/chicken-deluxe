@@ -300,7 +300,7 @@ The database has **13 tables**, listed in the order they appear in `schema.sql`.
 
 > All triggers live in [`sql/triggers.sql`](sql/triggers.sql). They are created on the **Master** node only and replicate to the **Slave** automatically. Triggers were a coursework requirement and are used here for things that **must** always happen, no matter which page or developer wrote the surrounding code.
 
-We have **28 active triggers** (7 business-rule triggers documented below as Triggers 1–7, plus 21 change-logging triggers documented as Trigger Group 9) and **1 trigger that was removed** (because of a MySQL limitation, see Trigger 8).
+We have **33 active triggers** (6 business-rule triggers documented below as Triggers 1–6, plus 27 change-logging triggers documented as Trigger Group 9) and **2 triggers that were removed** (see Trigger 7 and Trigger 8).
 
 ---
 
@@ -462,34 +462,16 @@ DELIMITER ;
 
 ---
 
-### Trigger 7 — `trg_audit_inventory_unlock`
+### Trigger 7 (REMOVED 2026-05) — `trg_audit_inventory_unlock`
 
-- **Table:** `Inventory_Snapshot`
-- **Event:** `AFTER UPDATE`
+This trigger used to fire `AFTER UPDATE ON Inventory_Snapshot` and insert a row into `Audit_Log` with `Action='RECORD_UNLOCKED'` whenever `Locked_status` flipped from `1` to `0`.
 
-**What it does (step by step):**
-1. An `Inventory_Snapshot` row was just updated.
-2. The trigger checks: was this an unlock action (`OLD.Locked_status = 1` AND `NEW.Locked_status = 0`)?
-3. If yes, it inserts a new row into `Audit_Log` with action `RECORD_UNLOCKED`, the user who did it, the snapshot ID, and the snapshot date.
+**Removed because:**
+- It only set `User_ID`, `Action`, `Details`, `Timestamp` — it left `Operation`, `Table_name`, `Old_values`, `New_values` NULL even though those fields exist on `Audit_Log`. So filtering the Audit Log viewer by `Table_name` silently hid every unlock event.
+- It duplicated with `trg_log_inventory_snapshot_update` (Trigger Group 9), which already captures every unlock with full Old/New JSON — including the `Locked_status: 1 → 0` change, which is enough to identify it as an unlock.
+- Result: every inventory unlock was generating 3 Audit_Log rows (this trigger + the change-logging trigger + the application-level `auditLog->log()` call). After removal it's now 2 rows, both with full information.
 
-**Why it is needed:** Unlocking past records is the most sensitive thing the Owner can do — it lets historical numbers be edited. The audit trail must show every unlock, every time, no exceptions. The trigger guarantees this even if a future developer forgets to write the audit log call.
-
-```sql
-DROP TRIGGER IF EXISTS trg_audit_inventory_unlock;
-DELIMITER $$
-CREATE TRIGGER trg_audit_inventory_unlock
-AFTER UPDATE ON Inventory_Snapshot
-FOR EACH ROW
-BEGIN
-    IF OLD.Locked_status = 1 AND NEW.Locked_status = 0 THEN
-        INSERT INTO Audit_Log (User_ID, Action, Details, Timestamp)
-        VALUES (NEW.User_ID, 'RECORD_UNLOCKED',
-            CONCAT('Inventory_Snapshot ID:', NEW.Inventory_ID, ' unlocked for ', NEW.Snapshot_date),
-            NOW());
-    END IF;
-END$$
-DELIMITER ;
-```
+`triggers.sql` keeps a `DROP TRIGGER IF EXISTS trg_audit_inventory_unlock;` line so older databases get the trigger cleaned up on a fresh schema run.
 
 ---
 
@@ -517,9 +499,9 @@ if ($type === 'ending') {
 
 ### Trigger Group 9 — Change-Logging Triggers (`trg_log_<table>_<event>`)
 
-These 21 triggers were added on 2026-04-20 to satisfy rubric §1.3 ("record change logging with old/new values"). They are mechanical — same shape for every table — so they are documented once as a group instead of repeating 21 near-identical listings. The full source is in [`sql/triggers.sql`](sql/triggers.sql).
+These **27 triggers** satisfy rubric §1.3 (21 added 2026-04-20 across 7 tables, 5 added 2026-04-28 for Part/Product_Part, 1 added 2026-05-03 for Product_Part UPDATE). They are mechanical — same shape for every table — so they are documented once as a group instead of repeating 27 near-identical listings. The full source is in [`sql/triggers.sql`](sql/triggers.sql).
 
-**Coverage matrix — 7 tables × 3 events = 21 triggers:**
+**Coverage matrix — 9 tables × 3 events = 27 triggers:**
 
 | Table | INSERT | UPDATE | DELETE |
 |---|---|---|---|
@@ -530,6 +512,8 @@ These 21 triggers were added on 2026-04-20 to satisfy rubric §1.3 ("record chan
 | `Product` | `trg_log_product_insert` | `trg_log_product_update` | `trg_log_product_delete` |
 | `User` | `trg_log_user_insert` | `trg_log_user_update` | `trg_log_user_delete` |
 | `Kiosk` | `trg_log_kiosk_insert` | `trg_log_kiosk_update` | `trg_log_kiosk_delete` |
+| `Part` | `trg_log_part_insert` | `trg_log_part_update` | `trg_log_part_delete` |
+| `Product_Part` | `trg_log_product_part_insert` | `trg_log_product_part_update` | `trg_log_product_part_delete` |
 
 **What every trigger does (uniform pattern):**
 
@@ -564,7 +548,13 @@ END$$
 
 **Live verification (2026-04-20):** inserting a test Product, updating its price, then deleting it produced `Audit_Log` rows 99, 100, 101 with the expected `Operation='INSERT'/'UPDATE'/'DELETE'`, `Table_name='Product'`, and fully populated JSON snapshots.
 
-**Note on `Audit_Log` duplication with `trg_audit_inventory_unlock`:** an Inventory_Snapshot unlock now produces **two** rows — one from the existing `trg_audit_inventory_unlock` (`Action='RECORD_UNLOCKED'`) and one from the new `trg_log_inventory_snapshot_update` (`Action='UPDATE'`). This is intentional — the two rows carry different semantic meaning (unlock event vs generic change) and the Reports module can filter either independently.
+**2026-05 audit-accuracy fix.** Two updates were made to keep audit rows truthful for the parts-based system:
+- The `Inventory_Snapshot` change-logging triggers now include `Part_ID` in the JSON snapshot. Previously they only logged `Product_ID`, which is always `NULL` since the parts migration — meaning audit rows had no way to identify which part was changed.
+- The `Delivery` change-logging triggers now include `Part_ID`, `Type` (`Delivery` vs `Pullout`), and `Notes` (pullout reason). Previously a pullout was indistinguishable from a delivery in the audit trail.
+
+`trg_log_product_part_update` was also added 2026-05-03 — Product_Part originally only had INSERT and DELETE triggers, so recipe edits (changing `Quantity_needed`) were silent.
+
+Migration: [`sql/migrations/2026_05_fix_audit_triggers.sql`](sql/migrations/2026_05_fix_audit_triggers.sql).
 
 ---
 ---
@@ -727,11 +717,11 @@ Every new or different item from the original ERD, in one place:
 | `trg_prevent_locked_inventory_edit` | Trigger | `Inventory_Snapshot` | Block edits on locked Inventory rows |
 | `trg_prevent_locked_delivery_edit` | Trigger | `Delivery` | Block edits on locked Delivery rows |
 | `trg_prevent_locked_expense_edit` | Trigger | `Expenses` | Block edits on locked Expenses rows |
-| `trg_audit_inventory_unlock` | Trigger | `Inventory_Snapshot` | Auto-log a `RECORD_UNLOCKED` entry on every unlock |
+| `trg_audit_inventory_unlock` | **Removed trigger** | `Inventory_Snapshot` | Removed 2026-05 — duplicate of `trg_log_inventory_snapshot_update` which already captures every unlock with full Old/New values |
 | `trg_auto_lock_inventory` | Removed trigger | `Inventory_Snapshot` | Replaced by PHP logic (MySQL error 1442) |
-| `trg_log_*_insert` (×7) | Trigger group | Sales/Inventory_Snapshot/Delivery/Expenses/Product/User/Kiosk | Change-logging: capture NEW row as JSON in Audit_Log |
-| `trg_log_*_update` (×7) | Trigger group | same 7 tables | Change-logging: capture OLD and NEW rows as JSON in Audit_Log |
-| `trg_log_*_delete` (×7) | Trigger group | same 7 tables | Change-logging: capture OLD row as JSON in Audit_Log |
+| `trg_log_*_insert` (×9) | Trigger group | Sales/Inventory_Snapshot/Delivery/Expenses/Product/User/Kiosk/Part/Product_Part | Change-logging: capture NEW row as JSON in Audit_Log |
+| `trg_log_*_update` (×9) | Trigger group | same 9 tables | Change-logging: capture OLD and NEW rows as JSON in Audit_Log |
+| `trg_log_*_delete` (×9) | Trigger group | same 9 tables | Change-logging: capture OLD row as JSON in Audit_Log |
 | Seed: 3 roles | Seed data | `Role` | Owner / Staff / Auditor |
 | Seed: 5 kiosks | Seed data | `Kiosk` | All 5 kiosks pre-loaded |
 | Seed: 5 categories | Seed data | `Category` | Burgers / Drinks / Hotdogs / Ricebowl / Snacks |

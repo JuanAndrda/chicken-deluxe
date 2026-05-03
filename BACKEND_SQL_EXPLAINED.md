@@ -701,32 +701,15 @@ DELIMITER ;
 
 **`SIGNAL SQLSTATE '45000'`** is how a trigger says "throw an error and cancel this query." `45000` is MySQL's generic user-defined error code. The whole UPDATE is rolled back and the error message bubbles up to PHP as a `PDOException`.
 
-### 4.4 Trigger — log inventory unlocks specifically
+### 4.4 Trigger removed — `trg_audit_inventory_unlock`
 
-**Name:** `trg_audit_inventory_unlock`
+This used to be an `AFTER UPDATE` trigger on `Inventory_Snapshot` that wrote a `RECORD_UNLOCKED` row to `Audit_Log` whenever `Locked_status` flipped from `1` to `0`.
 
-**Why we need it:** unlocking a past inventory record is the most sensitive thing the Owner can do — it lets historical numbers be edited. We want a guaranteed entry for every unlock, separate from the generic change-logging trigger.
+**Removed 2026-05** because it wrote a half-empty row (Operation/Table_name/Old_values/New_values were left NULL even though `Audit_Log` has those columns) AND duplicated with `trg_log_inventory_snapshot_update` which already captures every unlock — including the `Locked_status: 1 → 0` transition — with full JSON payload.
 
-```sql
-DELIMITER $$
-CREATE TRIGGER trg_audit_inventory_unlock
-AFTER UPDATE ON Inventory_Snapshot
-FOR EACH ROW
-BEGIN
-    IF OLD.Locked_status = 1 AND NEW.Locked_status = 0 THEN
-        INSERT INTO Audit_Log (User_ID, Action, Details, Timestamp)
-        VALUES (NEW.User_ID, 'RECORD_UNLOCKED',
-            CONCAT('Inventory_Snapshot ID:', NEW.Inventory_ID,
-                   ' unlocked for ', NEW.Snapshot_date),
-            NOW());
-    END IF;
-END$$
-DELIMITER ;
-```
+Net effect: every unlock used to generate **3** Audit_Log rows (this trigger + the change-logging trigger + the controller's `auditLog->log()` call). After removal, it's **2** rows, both with full data.
 
-> **Note:** an unlock now produces TWO audit rows — this one (`Action='RECORD_UNLOCKED'`) and one from `trg_log_inventory_snapshot_update` (`Action='UPDATE'`). That's intentional — they carry different semantic meaning and the Audit Log page can filter on either.
-
-### All 28 triggers at a glance
+### All 33 triggers at a glance
 
 | # | Trigger | Table | Event | Job |
 |---|---|---|---|---|
@@ -736,16 +719,17 @@ DELIMITER ;
 | 4 | `trg_prevent_locked_inventory_edit` | Inventory_Snapshot | BEFORE UPDATE | Block edits on locked Inventory |
 | 5 | `trg_prevent_locked_delivery_edit` | Delivery | BEFORE UPDATE | Block edits on locked Delivery |
 | 6 | `trg_prevent_locked_expense_edit` | Expenses | BEFORE UPDATE | Block edits on locked Expenses |
-| 7 | `trg_audit_inventory_unlock` | Inventory_Snapshot | AFTER UPDATE | Log every unlock event |
-| 8 – 10 | `trg_log_sales_{insert,update,delete}` | Sales | AFTER INSERT/UPDATE/DELETE | Change-log to Audit_Log |
-| 11 – 13 | `trg_log_inventory_snapshot_{insert,update,delete}` | Inventory_Snapshot | AFTER ... | Change-log |
-| 14 – 16 | `trg_log_delivery_{insert,update,delete}` | Delivery | AFTER ... | Change-log |
-| 17 – 19 | `trg_log_expenses_{insert,update,delete}` | Expenses | AFTER ... | Change-log |
-| 20 – 22 | `trg_log_product_{insert,update,delete}` | Product | AFTER ... | Change-log |
-| 23 – 25 | `trg_log_user_{insert,update,delete}` | User | AFTER ... | Change-log (Password excluded) |
-| 26 – 28 | `trg_log_kiosk_{insert,update,delete}` | Kiosk | AFTER ... | Change-log |
+| 7 – 9 | `trg_log_sales_{insert,update,delete}` | Sales | AFTER INSERT/UPDATE/DELETE | Change-log to Audit_Log |
+| 10 – 12 | `trg_log_inventory_snapshot_{insert,update,delete}` | Inventory_Snapshot | AFTER ... | Change-log |
+| 13 – 15 | `trg_log_delivery_{insert,update,delete}` | Delivery | AFTER ... | Change-log |
+| 16 – 18 | `trg_log_expenses_{insert,update,delete}` | Expenses | AFTER ... | Change-log |
+| 19 – 21 | `trg_log_product_{insert,update,delete}` | Product | AFTER ... | Change-log |
+| 22 – 24 | `trg_log_user_{insert,update,delete}` | User | AFTER ... | Change-log (Password excluded) |
+| 25 – 27 | `trg_log_kiosk_{insert,update,delete}` | Kiosk | AFTER ... | Change-log |
+| 28 – 30 | `trg_log_part_{insert,update,delete}` | Part | AFTER ... | Change-log |
+| 31 – 33 | `trg_log_product_part_{insert,update,delete}` | Product_Part | AFTER ... | Change-log (UPDATE added 2026-05) |
 
-**Categories:** 7 business-rule triggers (1–7) + 21 change-logging triggers (8–28) = **28 total**.
+**Categories:** 6 business-rule triggers (1–6) + 27 change-logging triggers = **33 total**. (Adds Part [3] and Product_Part [3] to the original 7-table change-logging set.)
 
 ### How to inspect triggers in MySQL yourself
 

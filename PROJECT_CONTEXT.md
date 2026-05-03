@@ -392,19 +392,20 @@ public function insert(string $sql, array $params = []): int  { /* → Master */
 ### What Triggers Are Used For
 Triggers automate backend logic that must happen every time a specific database event occurs — without relying on application code to remember to do it.
 
-### Current Trigger Inventory (28 total, as of 2026-04-20)
+### Current Trigger Inventory (33 total, last updated 2026-05-03)
 
-**Business-rule triggers (7)** — validation + calculation:
+**Business-rule triggers (6)** — validation + calculation:
 - `trg_calc_line_total_insert` / `trg_calc_line_total_update` — auto-compute `Sales.Line_total`
 - `trg_prevent_locked_sales_edit` / `..._inventory_edit` / `..._delivery_edit` / `..._expense_edit` — block UPDATE on locked rows via `SIGNAL SQLSTATE '45000'`
-- `trg_audit_inventory_unlock` — writes a `RECORD_UNLOCKED` row to `Audit_Log` whenever `Inventory_Snapshot.Locked_status` flips 1 → 0
+- ~~`trg_audit_inventory_unlock`~~ — **removed 2026-05.** Was redundant with `trg_log_inventory_snapshot_update` (which already logs the unlock with full Old/New values) and wrote a half-empty Audit_Log row.
 
-**Change-logging triggers (21)** — rubric §1.3:
+**Change-logging triggers (27)** — rubric §1.3:
 - Naming: `trg_log_<table>_<event>`
-- Coverage: `AFTER INSERT / UPDATE / DELETE` on **Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk** (7 tables × 3 events = 21)
+- Coverage: `AFTER INSERT / UPDATE / DELETE` on **Sales, Inventory_Snapshot, Delivery, Expenses, Product, User, Kiosk, Part, Product_Part** (9 tables × 3 events = 27)
 - Payload: `Operation`, `Table_name`, `Old_values` (JSON_OBJECT of OLD row), `New_values` (JSON_OBJECT of NEW row), `Details`, `Timestamp`
 - `User.Password` is deliberately excluded from the User triggers
-- Source: [`sql/triggers.sql`](sql/triggers.sql) (full definitions), [`sql/migrations/2026_add_change_logging.sql`](sql/migrations/2026_add_change_logging.sql) (install script)
+- **2026-05 fix:** Inventory_Snapshot triggers now include `Part_ID` in the JSON snapshot (was only logging legacy `Product_ID`). Delivery triggers now include `Part_ID`, `Type` (Delivery vs Pullout), and `Notes` (pullout reason).
+- Source: [`sql/triggers.sql`](sql/triggers.sql) (full definitions), [`sql/migrations/2026_add_change_logging.sql`](sql/migrations/2026_add_change_logging.sql) (initial install), [`sql/migrations/2026_05_fix_audit_triggers.sql`](sql/migrations/2026_05_fix_audit_triggers.sql) (parts-aware fix)
 
 ### Historical / Example Trigger Drafts
 
@@ -456,6 +457,8 @@ BEGIN
 END$$
 DELIMITER ;
 ```
+
+> ⚠️ **Note:** This style of dedicated unlock-only trigger is **no longer used.** As of 2026-05 the generic `trg_log_inventory_snapshot_update` change-logging trigger captures every unlock with full Operation/Old/New values, making the dedicated trigger redundant.
 
 #### 4. Prevent edits on locked records
 ```sql
