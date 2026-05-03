@@ -105,22 +105,20 @@ DELIMITER ;
 DROP TRIGGER IF EXISTS trg_auto_lock_inventory;
 
 -- ==================
--- 8. Audit log on inventory unlock (status change from 1 to 0)
+-- 8. (REMOVED 2026-05) trg_audit_inventory_unlock
 -- ==================
+-- Was a dedicated AFTER UPDATE trigger that wrote a 'RECORD_UNLOCKED'
+-- row whenever Inventory_Snapshot.Locked_status flipped 1 -> 0.
+-- Removed because:
+--   * It wrote a half-empty Audit_Log row (Operation/Table_name/
+--     Old_values/New_values left NULL even though the data was
+--     available), so it broke filtering in the Audit Log viewer.
+--   * trg_log_inventory_snapshot_update already captures every
+--     unlock with full Operation + Old_values + New_values, so the
+--     dedicated trigger was duplicate noise.
+-- DROP IF EXISTS is kept so older databases get cleaned up on a
+-- fresh schema run.
 DROP TRIGGER IF EXISTS trg_audit_inventory_unlock;
-DELIMITER $$
-CREATE TRIGGER trg_audit_inventory_unlock
-AFTER UPDATE ON Inventory_Snapshot
-FOR EACH ROW
-BEGIN
-    IF OLD.Locked_status = 1 AND NEW.Locked_status = 0 THEN
-        INSERT INTO Audit_Log (User_ID, Action, Details, Timestamp)
-        VALUES (NEW.User_ID, 'RECORD_UNLOCKED',
-            CONCAT('Inventory_Snapshot ID:', NEW.Inventory_ID, ' unlocked for ', NEW.Snapshot_date),
-            NOW());
-    END IF;
-END$$
-DELIMITER ;
 
 -- ============================================
 -- CHANGE LOGGING TRIGGERS (IM Final Project Requirement)
@@ -188,6 +186,8 @@ END$$
 DELIMITER ;
 
 -- --- INVENTORY_SNAPSHOT --------------------------------------------
+-- Note (2026-05): JSON snapshots include Part_ID alongside the
+-- legacy Product_ID so parts-based audit rows are meaningful.
 DROP TRIGGER IF EXISTS trg_log_inventory_snapshot_insert;
 DELIMITER $$
 CREATE TRIGGER trg_log_inventory_snapshot_insert
@@ -196,9 +196,11 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (NEW.User_ID, 'INSERT', 'INSERT', 'Inventory_Snapshot', NULL,
-        JSON_OBJECT('Inventory_ID', NEW.Inventory_ID, 'Kiosk_ID', NEW.Kiosk_ID, 'Product_ID', NEW.Product_ID,
-            'User_ID', NEW.User_ID, 'Locked_status', NEW.Locked_status, 'Snapshot_date', NEW.Snapshot_date,
-            'Snapshot_type', NEW.Snapshot_type, 'Quantity', NEW.Quantity),
+        JSON_OBJECT('Inventory_ID', NEW.Inventory_ID, 'Kiosk_ID', NEW.Kiosk_ID,
+            'Product_ID', NEW.Product_ID, 'Part_ID', NEW.Part_ID,
+            'User_ID', NEW.User_ID, 'Locked_status', NEW.Locked_status,
+            'Snapshot_date', NEW.Snapshot_date, 'Snapshot_type', NEW.Snapshot_type,
+            'Quantity', NEW.Quantity),
         CONCAT('New record inserted into Inventory_Snapshot ID:', NEW.Inventory_ID), NOW());
 END$$
 DELIMITER ;
@@ -211,12 +213,16 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (NEW.User_ID, 'UPDATE', 'UPDATE', 'Inventory_Snapshot',
-        JSON_OBJECT('Inventory_ID', OLD.Inventory_ID, 'Kiosk_ID', OLD.Kiosk_ID, 'Product_ID', OLD.Product_ID,
-            'User_ID', OLD.User_ID, 'Locked_status', OLD.Locked_status, 'Snapshot_date', OLD.Snapshot_date,
-            'Snapshot_type', OLD.Snapshot_type, 'Quantity', OLD.Quantity),
-        JSON_OBJECT('Inventory_ID', NEW.Inventory_ID, 'Kiosk_ID', NEW.Kiosk_ID, 'Product_ID', NEW.Product_ID,
-            'User_ID', NEW.User_ID, 'Locked_status', NEW.Locked_status, 'Snapshot_date', NEW.Snapshot_date,
-            'Snapshot_type', NEW.Snapshot_type, 'Quantity', NEW.Quantity),
+        JSON_OBJECT('Inventory_ID', OLD.Inventory_ID, 'Kiosk_ID', OLD.Kiosk_ID,
+            'Product_ID', OLD.Product_ID, 'Part_ID', OLD.Part_ID,
+            'User_ID', OLD.User_ID, 'Locked_status', OLD.Locked_status,
+            'Snapshot_date', OLD.Snapshot_date, 'Snapshot_type', OLD.Snapshot_type,
+            'Quantity', OLD.Quantity),
+        JSON_OBJECT('Inventory_ID', NEW.Inventory_ID, 'Kiosk_ID', NEW.Kiosk_ID,
+            'Product_ID', NEW.Product_ID, 'Part_ID', NEW.Part_ID,
+            'User_ID', NEW.User_ID, 'Locked_status', NEW.Locked_status,
+            'Snapshot_date', NEW.Snapshot_date, 'Snapshot_type', NEW.Snapshot_type,
+            'Quantity', NEW.Quantity),
         CONCAT('Record updated in Inventory_Snapshot ID:', NEW.Inventory_ID), NOW());
 END$$
 DELIMITER ;
@@ -229,14 +235,19 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (OLD.User_ID, 'DELETE', 'DELETE', 'Inventory_Snapshot',
-        JSON_OBJECT('Inventory_ID', OLD.Inventory_ID, 'Kiosk_ID', OLD.Kiosk_ID, 'Product_ID', OLD.Product_ID,
-            'User_ID', OLD.User_ID, 'Locked_status', OLD.Locked_status, 'Snapshot_date', OLD.Snapshot_date,
-            'Snapshot_type', OLD.Snapshot_type, 'Quantity', OLD.Quantity),
+        JSON_OBJECT('Inventory_ID', OLD.Inventory_ID, 'Kiosk_ID', OLD.Kiosk_ID,
+            'Product_ID', OLD.Product_ID, 'Part_ID', OLD.Part_ID,
+            'User_ID', OLD.User_ID, 'Locked_status', OLD.Locked_status,
+            'Snapshot_date', OLD.Snapshot_date, 'Snapshot_type', OLD.Snapshot_type,
+            'Quantity', OLD.Quantity),
         NULL, CONCAT('Record deleted from Inventory_Snapshot ID:', OLD.Inventory_ID), NOW());
 END$$
 DELIMITER ;
 
 -- --- DELIVERY ------------------------------------------------------
+-- Note (2026-05): JSON snapshots include Part_ID, Type and Notes
+-- so audit rows can distinguish Delivery vs Pullout and capture the
+-- pullout reason.
 DROP TRIGGER IF EXISTS trg_log_delivery_insert;
 DELIMITER $$
 CREATE TRIGGER trg_log_delivery_insert
@@ -245,9 +256,10 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (NEW.User_ID, 'INSERT', 'INSERT', 'Delivery', NULL,
-        JSON_OBJECT('Delivery_ID', NEW.Delivery_ID, 'Kiosk_ID', NEW.Kiosk_ID, 'User_ID', NEW.User_ID,
-            'Product_ID', NEW.Product_ID, 'Delivery_Date', NEW.Delivery_Date, 'Quantity', NEW.Quantity,
-            'Locked_status', NEW.Locked_status),
+        JSON_OBJECT('Delivery_ID', NEW.Delivery_ID, 'Kiosk_ID', NEW.Kiosk_ID,
+            'User_ID', NEW.User_ID, 'Product_ID', NEW.Product_ID, 'Part_ID', NEW.Part_ID,
+            'Delivery_Date', NEW.Delivery_Date, 'Quantity', NEW.Quantity,
+            'Type', NEW.Type, 'Notes', NEW.Notes, 'Locked_status', NEW.Locked_status),
         CONCAT('New record inserted into Delivery ID:', NEW.Delivery_ID), NOW());
 END$$
 DELIMITER ;
@@ -260,12 +272,14 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (NEW.User_ID, 'UPDATE', 'UPDATE', 'Delivery',
-        JSON_OBJECT('Delivery_ID', OLD.Delivery_ID, 'Kiosk_ID', OLD.Kiosk_ID, 'User_ID', OLD.User_ID,
-            'Product_ID', OLD.Product_ID, 'Delivery_Date', OLD.Delivery_Date, 'Quantity', OLD.Quantity,
-            'Locked_status', OLD.Locked_status),
-        JSON_OBJECT('Delivery_ID', NEW.Delivery_ID, 'Kiosk_ID', NEW.Kiosk_ID, 'User_ID', NEW.User_ID,
-            'Product_ID', NEW.Product_ID, 'Delivery_Date', NEW.Delivery_Date, 'Quantity', NEW.Quantity,
-            'Locked_status', NEW.Locked_status),
+        JSON_OBJECT('Delivery_ID', OLD.Delivery_ID, 'Kiosk_ID', OLD.Kiosk_ID,
+            'User_ID', OLD.User_ID, 'Product_ID', OLD.Product_ID, 'Part_ID', OLD.Part_ID,
+            'Delivery_Date', OLD.Delivery_Date, 'Quantity', OLD.Quantity,
+            'Type', OLD.Type, 'Notes', OLD.Notes, 'Locked_status', OLD.Locked_status),
+        JSON_OBJECT('Delivery_ID', NEW.Delivery_ID, 'Kiosk_ID', NEW.Kiosk_ID,
+            'User_ID', NEW.User_ID, 'Product_ID', NEW.Product_ID, 'Part_ID', NEW.Part_ID,
+            'Delivery_Date', NEW.Delivery_Date, 'Quantity', NEW.Quantity,
+            'Type', NEW.Type, 'Notes', NEW.Notes, 'Locked_status', NEW.Locked_status),
         CONCAT('Record updated in Delivery ID:', NEW.Delivery_ID), NOW());
 END$$
 DELIMITER ;
@@ -278,9 +292,10 @@ FOR EACH ROW
 BEGIN
     INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
     VALUES (OLD.User_ID, 'DELETE', 'DELETE', 'Delivery',
-        JSON_OBJECT('Delivery_ID', OLD.Delivery_ID, 'Kiosk_ID', OLD.Kiosk_ID, 'User_ID', OLD.User_ID,
-            'Product_ID', OLD.Product_ID, 'Delivery_Date', OLD.Delivery_Date, 'Quantity', OLD.Quantity,
-            'Locked_status', OLD.Locked_status),
+        JSON_OBJECT('Delivery_ID', OLD.Delivery_ID, 'Kiosk_ID', OLD.Kiosk_ID,
+            'User_ID', OLD.User_ID, 'Product_ID', OLD.Product_ID, 'Part_ID', OLD.Part_ID,
+            'Delivery_Date', OLD.Delivery_Date, 'Quantity', OLD.Quantity,
+            'Type', OLD.Type, 'Notes', OLD.Notes, 'Locked_status', OLD.Locked_status),
         NULL, CONCAT('Record deleted from Delivery ID:', OLD.Delivery_ID), NOW());
 END$$
 DELIMITER ;
@@ -520,7 +535,7 @@ BEGIN
 END$$
 DELIMITER ;
 
--- --- PRODUCT_PART (no UPDATE trigger — recipe rows are replaced not updated) ---
+-- --- PRODUCT_PART (full insert/update/delete coverage) ---
 DROP TRIGGER IF EXISTS trg_log_product_part_insert;
 DELIMITER $$
 CREATE TRIGGER trg_log_product_part_insert
@@ -532,6 +547,22 @@ BEGIN
         JSON_OBJECT('Product_Part_ID', NEW.Product_Part_ID, 'Product_ID', NEW.Product_ID,
             'Part_ID', NEW.Part_ID, 'Quantity_needed', NEW.Quantity_needed),
         CONCAT('New recipe row inserted: Product_Part ID:', NEW.Product_Part_ID), NOW());
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_log_product_part_update;
+DELIMITER $$
+CREATE TRIGGER trg_log_product_part_update
+AFTER UPDATE ON Product_Part
+FOR EACH ROW
+BEGIN
+    INSERT INTO Audit_Log (User_ID, Action, Operation, Table_name, Old_values, New_values, Details, Timestamp)
+    VALUES (NULL, 'UPDATE', 'UPDATE', 'Product_Part',
+        JSON_OBJECT('Product_Part_ID', OLD.Product_Part_ID, 'Product_ID', OLD.Product_ID,
+            'Part_ID', OLD.Part_ID, 'Quantity_needed', OLD.Quantity_needed),
+        JSON_OBJECT('Product_Part_ID', NEW.Product_Part_ID, 'Product_ID', NEW.Product_ID,
+            'Part_ID', NEW.Part_ID, 'Quantity_needed', NEW.Quantity_needed),
+        CONCAT('Recipe row updated: Product_Part ID:', NEW.Product_Part_ID), NOW());
 END$$
 DELIMITER ;
 
