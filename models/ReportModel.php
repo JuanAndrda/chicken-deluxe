@@ -114,38 +114,42 @@ class ReportModel extends Model
         return (float) ($row['Total'] ?? 0);
     }
 
-    /** Get sales totals per kiosk for a date range */
-    public function getSalesTotalsByKiosk(string $from_date, string $to_date): array
+    /** Get sales totals per kiosk for a date range (optionally filter to one kiosk) */
+    public function getSalesTotalsByKiosk(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
-        return $this->db->read(
-            "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
-                    COUNT(s.Sales_ID) AS Total_Transactions,
-                    COALESCE(SUM(s.Line_total), 0) AS Total_Sales
-             FROM Kiosk k
-             LEFT JOIN Sales s ON k.Kiosk_ID = s.Kiosk_ID
-                AND s.Sales_date BETWEEN ? AND ?
-             WHERE k.Active = 1
-             GROUP BY k.Kiosk_ID, k.Name
-             ORDER BY k.Kiosk_ID",
-            [$from_date, $to_date]
-        );
+        $sql = "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
+                       COUNT(s.Sales_ID) AS Total_Transactions,
+                       COALESCE(SUM(s.Line_total), 0) AS Total_Sales
+                FROM Kiosk k
+                LEFT JOIN Sales s ON k.Kiosk_ID = s.Kiosk_ID
+                   AND s.Sales_date BETWEEN ? AND ?
+                WHERE k.Active = 1";
+        $params = [$from_date, $to_date];
+        if ($kiosk_id !== null) {
+            $sql .= " AND k.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
+        }
+        $sql .= " GROUP BY k.Kiosk_ID, k.Name ORDER BY k.Kiosk_ID";
+        return $this->db->read($sql, $params);
     }
 
-    /** Get expense totals per kiosk for a date range */
-    public function getExpenseTotalsByKiosk(string $from_date, string $to_date): array
+    /** Get expense totals per kiosk for a date range (optionally filter to one kiosk) */
+    public function getExpenseTotalsByKiosk(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
-        return $this->db->read(
-            "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
-                    COUNT(e.Expense_ID) AS Total_Entries,
-                    COALESCE(SUM(e.Amount), 0) AS Total_Expenses
-             FROM Kiosk k
-             LEFT JOIN Expenses e ON k.Kiosk_ID = e.Kiosk_ID
-                AND e.Expense_date BETWEEN ? AND ?
-             WHERE k.Active = 1
-             GROUP BY k.Kiosk_ID, k.Name
-             ORDER BY k.Kiosk_ID",
-            [$from_date, $to_date]
-        );
+        $sql = "SELECT k.Name AS Kiosk_Name, k.Kiosk_ID,
+                       COUNT(e.Expense_ID) AS Total_Entries,
+                       COALESCE(SUM(e.Amount), 0) AS Total_Expenses
+                FROM Kiosk k
+                LEFT JOIN Expenses e ON k.Kiosk_ID = e.Kiosk_ID
+                   AND e.Expense_date BETWEEN ? AND ?
+                WHERE k.Active = 1";
+        $params = [$from_date, $to_date];
+        if ($kiosk_id !== null) {
+            $sql .= " AND k.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
+        }
+        $sql .= " GROUP BY k.Kiosk_ID, k.Name ORDER BY k.Kiosk_ID";
+        return $this->db->read($sql, $params);
     }
 
     /** Get daily sales breakdown for a date range and optional kiosk */
@@ -229,25 +233,28 @@ class ReportModel extends Model
     }
 
     /** Get dates with missing beginning or ending snapshots (anomalies) */
-    public function getMissingSnapshots(string $from_date, string $to_date): array
+    public function getMissingSnapshots(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
-        return $this->db->read(
-            "SELECT k.Name AS Kiosk_Name, i.Snapshot_date,
-                    SUM(CASE WHEN i.Snapshot_type = 'beginning' THEN 1 ELSE 0 END) AS has_beginning,
-                    SUM(CASE WHEN i.Snapshot_type = 'ending' THEN 1 ELSE 0 END) AS has_ending
-             FROM Kiosk k
-             CROSS JOIN (
-                 SELECT DISTINCT Snapshot_date FROM Inventory_Snapshot
-                 WHERE Snapshot_date BETWEEN ? AND ?
-             ) dates
-             LEFT JOIN Inventory_Snapshot i ON k.Kiosk_ID = i.Kiosk_ID
-                AND i.Snapshot_date = dates.Snapshot_date
-             WHERE k.Active = 1
-             GROUP BY k.Kiosk_ID, dates.Snapshot_date
-             HAVING has_beginning = 0 OR has_ending = 0
-             ORDER BY dates.Snapshot_date DESC, k.Name",
-            [$from_date, $to_date]
-        );
+        $sql = "SELECT k.Name AS Kiosk_Name, i.Snapshot_date,
+                       SUM(CASE WHEN i.Snapshot_type = 'beginning' THEN 1 ELSE 0 END) AS has_beginning,
+                       SUM(CASE WHEN i.Snapshot_type = 'ending' THEN 1 ELSE 0 END) AS has_ending
+                FROM Kiosk k
+                CROSS JOIN (
+                    SELECT DISTINCT Snapshot_date FROM Inventory_Snapshot
+                    WHERE Snapshot_date BETWEEN ? AND ?
+                ) dates
+                LEFT JOIN Inventory_Snapshot i ON k.Kiosk_ID = i.Kiosk_ID
+                   AND i.Snapshot_date = dates.Snapshot_date
+                WHERE k.Active = 1";
+        $params = [$from_date, $to_date];
+        if ($kiosk_id !== null) {
+            $sql .= " AND k.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
+        }
+        $sql .= " GROUP BY k.Kiosk_ID, dates.Snapshot_date
+                  HAVING has_beginning = 0 OR has_ending = 0
+                  ORDER BY dates.Snapshot_date DESC, k.Name";
+        return $this->db->read($sql, $params);
     }
 
     /**
@@ -259,8 +266,12 @@ class ReportModel extends Model
      *
      * Output columns: Product_ID, Name, Category_Name, Total_Sold, Avg_Sold
      */
-    public function getProductsAboveAverageSales(string $from_date, string $to_date): array
+    public function getProductsAboveAverageSales(string $from_date, string $to_date, ?int $kiosk_id = null): array
     {
+        // When a single kiosk is selected, scope BOTH the average baseline and
+        // the outer aggregation to that kiosk so "above average" stays meaningful.
+        $kiosk_clause = $kiosk_id !== null ? " AND %s.Kiosk_ID = ?" : "";
+
         $sql = "SELECT p.Product_ID,
                        p.Name,
                        c.Name AS Category_Name,
@@ -270,31 +281,37 @@ class ReportModel extends Model
                            FROM (
                                SELECT SUM(s2.Quantity_sold) AS per_product_total
                                FROM Sales s2
-                               WHERE s2.Sales_date BETWEEN ? AND ?
+                               WHERE s2.Sales_date BETWEEN ? AND ?"
+                                . sprintf($kiosk_clause, 's2') . "
                                GROUP BY s2.Product_ID
                            ) avg_src
                        ) AS Avg_Sold
                 FROM Sales s
                 JOIN Product  p ON s.Product_ID = p.Product_ID
                 JOIN Category c ON p.Category_ID = c.Category_ID
-                WHERE s.Sales_date BETWEEN ? AND ?
+                WHERE s.Sales_date BETWEEN ? AND ?"
+                . sprintf($kiosk_clause, 's') . "
                 GROUP BY p.Product_ID, p.Name, c.Name
                 HAVING Total_Sold > (
                     SELECT AVG(per_product_total)
                     FROM (
                         SELECT SUM(s3.Quantity_sold) AS per_product_total
                         FROM Sales s3
-                        WHERE s3.Sales_date BETWEEN ? AND ?
+                        WHERE s3.Sales_date BETWEEN ? AND ?"
+                        . sprintf($kiosk_clause, 's3') . "
                         GROUP BY s3.Product_ID
                     ) avg_src2
                 )
                 ORDER BY Total_Sold DESC";
 
-        return $this->db->read($sql, [
-            $from_date, $to_date,
-            $from_date, $to_date,
-            $from_date, $to_date,
-        ]);
+        $params = [];
+        // Three repetitions of (from, to[, kiosk]) — order matches the SQL above.
+        for ($i = 0; $i < 3; $i++) {
+            $params[] = $from_date;
+            $params[] = $to_date;
+            if ($kiosk_id !== null) $params[] = $kiosk_id;
+        }
+        return $this->db->read($sql, $params);
     }
 
     /**
@@ -303,7 +320,7 @@ class ReportModel extends Model
      * given date. Uses a NOT IN subquery to exclude kiosks that already
      * closed the day's inventory.
      */
-    public function getKiosksWithoutEndingSnapshot(string $date): array
+    public function getKiosksWithoutEndingSnapshot(string $date, ?int $kiosk_id = null): array
     {
         $sql = "SELECT k.Kiosk_ID, k.Name, k.Location
                 FROM Kiosk k
@@ -313,9 +330,13 @@ class ReportModel extends Model
                       FROM Inventory_Snapshot i
                       WHERE i.Snapshot_date = ?
                         AND i.Snapshot_type = 'ending'
-                  )
-                ORDER BY k.Name";
-
-        return $this->db->read($sql, [$date]);
+                  )";
+        $params = [$date];
+        if ($kiosk_id !== null) {
+            $sql .= " AND k.Kiosk_ID = ?";
+            $params[] = $kiosk_id;
+        }
+        $sql .= " ORDER BY k.Name";
+        return $this->db->read($sql, $params);
     }
 }

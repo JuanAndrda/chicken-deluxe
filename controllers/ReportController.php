@@ -79,18 +79,16 @@ class ReportController extends Controller
         $from_date = $this->get('from_date', date('Y-m-d', strtotime('monday this week')));
         $to_date   = $this->get('to_date', date('Y-m-d'));
 
-        $sales_by_kiosk   = $this->reportModel->getSalesTotalsByKiosk($from_date, $to_date);
-        $expense_by_kiosk = $this->reportModel->getExpenseTotalsByKiosk($from_date, $to_date);
+        $sales_by_kiosk   = $this->reportModel->getSalesTotalsByKiosk($from_date, $to_date, $kiosk_id);
+        $expense_by_kiosk = $this->reportModel->getExpenseTotalsByKiosk($from_date, $to_date, $kiosk_id);
         $daily_sales      = $this->reportModel->getDailySalesBreakdown($from_date, $to_date, $kiosk_id);
         $daily_expenses   = $this->reportModel->getDailyExpenseBreakdown($from_date, $to_date, $kiosk_id);
         $deliveries       = $this->reportModel->getDeliverySummary($from_date, $to_date, $kiosk_id);
-        $anomalies        = $this->reportModel->getMissingSnapshots($from_date, $to_date);
+        $anomalies        = $this->reportModel->getMissingSnapshots($from_date, $to_date, $kiosk_id);
 
-        // Subquery-driven analytics:
-        //   getProductsAboveAverageSales — derived-table HAVING subquery
-        //   getKiosksWithoutEndingSnapshot — NOT IN subquery (for the report's end date)
-        $top_products     = $this->reportModel->getProductsAboveAverageSales($from_date, $to_date);
-        $kiosks_no_ending = $this->reportModel->getKiosksWithoutEndingSnapshot($to_date);
+        // Subquery-driven analytics — both honor the kiosk filter when set.
+        $top_products     = $this->reportModel->getProductsAboveAverageSales($from_date, $to_date, $kiosk_id);
+        $kiosks_no_ending = $this->reportModel->getKiosksWithoutEndingSnapshot($to_date, $kiosk_id);
 
         // Grand totals
         $grand_sales = 0;
