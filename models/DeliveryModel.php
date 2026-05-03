@@ -56,6 +56,15 @@ class DeliveryModel extends Model
         );
     }
 
+    /** Lock a single delivery record by ID */
+    public function lockOne(int $delivery_id): int
+    {
+        return $this->db->write(
+            "UPDATE Delivery SET Locked_status = 1 WHERE Delivery_ID = ? AND Locked_status = 0",
+            [$delivery_id]
+        );
+    }
+
     /** Unlock a delivery record (owner only) */
     public function unlock(int $delivery_id): int
     {

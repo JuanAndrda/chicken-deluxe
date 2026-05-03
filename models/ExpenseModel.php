@@ -78,6 +78,15 @@ class ExpenseModel extends Model
         );
     }
 
+    /** Lock a single expense record by ID */
+    public function lockOne(int $expense_id): int
+    {
+        return $this->db->write(
+            "UPDATE Expenses SET Locked_status = 1 WHERE Expense_ID = ? AND Locked_status = 0",
+            [$expense_id]
+        );
+    }
+
     /** Unlock an expense record (owner only) */
     public function unlock(int $expense_id): int
     {

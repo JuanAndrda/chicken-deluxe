@@ -60,9 +60,11 @@ class DeliveryController extends Controller
         // Newest first (Created_at DESC) — both source queries already sort that way; merge keeps it close enough
         usort($deliveries, fn($a, $b) => strcmp($b['Created_at'] ?? '', $a['Created_at'] ?? ''));
 
-        $any_locked = false;
+        $any_locked   = false;
+        $any_unlocked = false;
         foreach ($deliveries as $d) {
-            if ($d['Locked_status']) { $any_locked = true; break; }
+            if ($d['Locked_status']) { $any_locked = true; }
+            else                     { $any_unlocked = true; }
         }
 
         // Build a Part_ID → Running_Qty map so the Select Part table can show current stock
@@ -80,6 +82,7 @@ class DeliveryController extends Controller
             'deliveries'  => $deliveries,
             'is_today'    => $is_today,
             'any_locked'  => $any_locked,
+            'any_unlocked'=> $any_unlocked,
             'parts'       => $this->partModel->getActive(),
             'part_stock'  => $part_stock,
             'products'    => $this->productModel->getActiveGrouped(),
@@ -132,7 +135,7 @@ class DeliveryController extends Controller
         $this->redirect("/delivery?date={$date}&success=Delivery+recorded");
     }
 
-    /** Lock all deliveries for a date */
+    /** Lock deliveries — single row if delivery_id is posted, else all for the date */
     public function lock(): void
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
@@ -142,12 +145,20 @@ class DeliveryController extends Controller
             return;
         }
 
-        $kiosk_id = $this->resolveKiosk();
-        $date      = $this->post('date', date('Y-m-d'));
+        $kiosk_id    = $this->resolveKiosk();
+        $date        = $this->post('date', date('Y-m-d'));
+        $delivery_id = (int) $this->post('delivery_id');
+
+        if ($delivery_id > 0) {
+            $rows = $this->deliveryModel->lockOne($delivery_id);
+            $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked Delivery ID:{$delivery_id}");
+            $msg = $rows > 0 ? 'Record+locked' : 'Record+already+locked';
+            $this->redirect("/delivery?date={$date}&success={$msg}");
+            return;
+        }
 
         $count = $this->deliveryModel->lockByDate($kiosk_id, $date);
         $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} deliveries for kiosk:{$kiosk_id} on {$date}");
-
         $this->redirect("/delivery?date={$date}&success=Deliveries+locked+({$count}+records)");
     }
 

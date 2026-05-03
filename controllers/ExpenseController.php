@@ -31,9 +31,11 @@ class ExpenseController extends Controller
         $expenses  = $this->expenseModel->getByDateAndKiosk($date, $kiosk_id);
         $day_total = $this->expenseModel->getDailyTotal($date, $kiosk_id);
         $is_today  = ($date === date('Y-m-d'));
-        $any_locked = false;
+        $any_locked   = false;
+        $any_unlocked = false;
         foreach ($expenses as $e) {
-            if ($e['Locked_status']) { $any_locked = true; break; }
+            if ($e['Locked_status']) { $any_locked = true; }
+            else                     { $any_unlocked = true; }
         }
 
         $data = [
@@ -45,6 +47,7 @@ class ExpenseController extends Controller
             'day_total'   => $day_total,
             'is_today'    => $is_today,
             'any_locked'  => $any_locked,
+            'any_unlocked'=> $any_unlocked,
             'kiosks'      => Auth::isOwner() ? $this->kioskModel->getActive() : [],
             'history'     => $this->expenseModel->getRecordedDates($kiosk_id),
             'success'     => $_GET['success'] ?? null,
@@ -85,7 +88,7 @@ class ExpenseController extends Controller
         $this->redirect("/expenses?date={$date}&success=Expense+recorded");
     }
 
-    /** Lock all expenses for a date */
+    /** Lock expenses — single row if expense_id is posted, else all for the date */
     public function lock(): void
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
@@ -95,12 +98,20 @@ class ExpenseController extends Controller
             return;
         }
 
-        $kiosk_id = $this->resolveKiosk();
-        $date      = $this->post('date', date('Y-m-d'));
+        $kiosk_id   = $this->resolveKiosk();
+        $date       = $this->post('date', date('Y-m-d'));
+        $expense_id = (int) $this->post('expense_id');
+
+        if ($expense_id > 0) {
+            $rows = $this->expenseModel->lockOne($expense_id);
+            $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked Expense ID:{$expense_id}");
+            $msg = $rows > 0 ? 'Record+locked' : 'Record+already+locked';
+            $this->redirect("/expenses?date={$date}&success={$msg}");
+            return;
+        }
 
         $count = $this->expenseModel->lockByDate($kiosk_id, $date);
         $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} expenses for kiosk:{$kiosk_id} on {$date}");
-
         $this->redirect("/expenses?date={$date}&success=Expenses+locked+({$count}+records)");
     }
 

@@ -21,10 +21,14 @@
              alt="<?= APP_NAME ?>"
              class="sidebar-logo">
         <div class="sidebar-meta">
-            <?php if (Auth::isStaff() && Auth::kioskId()): ?>
-                <span class="sidebar-meta-branch">
+            <?php if (Auth::isOwner()): ?>
+                <span class="sidebar-meta-role">&#128737; Admin</span>
+            <?php elseif (Auth::isStaff() && Auth::kioskId()): ?>
+                <span class="sidebar-meta-role">
                     &#128205; <?= htmlspecialchars($_SESSION['kiosk_name'] ?? 'Kiosk ' . Auth::kioskId()) ?>
                 </span>
+            <?php elseif (Auth::isAuditor()): ?>
+                <span class="sidebar-meta-role">&#128065; Auditor</span>
             <?php endif; ?>
             <span class="sidebar-meta-clock" id="sidebarClock"></span>
         </div>

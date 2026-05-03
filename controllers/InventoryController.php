@@ -205,6 +205,30 @@ class InventoryController extends Controller
         }
     }
 
+    /** Lock a single inventory snapshot record (re-lock after edit) — Owner only */
+    public function lock(): void
+    {
+        Auth::requireRole([ROLE_OWNER]);
+
+        if (!Auth::validateCsrf()) {
+            $this->redirect('/inventory?error=Invalid+request');
+            return;
+        }
+
+        $inventory_id = (int) $this->post('inventory_id');
+        $date         = $this->post('date', date('Y-m-d'));
+
+        if ($inventory_id <= 0) {
+            $this->redirect("/inventory?date={$date}&error=Missing+record+ID");
+            return;
+        }
+
+        $rows = $this->inventoryModel->lockOne($inventory_id);
+        $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked Inventory_Snapshot ID:{$inventory_id}");
+        $msg = $rows > 0 ? 'Record+locked' : 'Record+already+locked';
+        $this->redirect("/inventory?date={$date}&success={$msg}");
+    }
+
     /** Unlock a record (owner only) */
     public function unlock(): void
     {

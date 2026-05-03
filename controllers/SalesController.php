@@ -37,9 +37,11 @@ class SalesController extends Controller
         $sales     = $this->salesModel->getByDateAndKiosk($date, $kiosk_id);
         $day_total = $this->salesModel->getDailyTotal($date, $kiosk_id);
         $is_today  = ($date === date('Y-m-d'));
-        $any_locked = false;
+        $any_locked   = false;
+        $any_unlocked = false;
         foreach ($sales as $s) {
-            if ($s['Locked_status']) { $any_locked = true; break; }
+            if ($s['Locked_status']) { $any_locked = true; }
+            else                     { $any_unlocked = true; }
         }
 
         // Build availability map: Product_ID => ['available' => bool, 'parts' => [...]]
@@ -97,6 +99,7 @@ class SalesController extends Controller
             'day_total'       => $day_total,
             'is_today'        => $is_today,
             'any_locked'      => $any_locked,
+            'any_unlocked'    => $any_unlocked,
             'products'        => $this->productModel->getActiveGrouped(),
             'product_map'     => $product_map,
             'availability_map'=> $availability_map,
@@ -275,7 +278,7 @@ class SalesController extends Controller
         }
     }
 
-    /** Lock all sales for a date */
+    /** Lock sales — single row if sales_id is posted, else all for the date */
     public function lock(): void
     {
         Auth::requireRole([ROLE_OWNER, ROLE_STAFF]);
@@ -286,11 +289,19 @@ class SalesController extends Controller
         }
 
         $kiosk_id = $this->resolveKiosk();
-        $date      = $this->post('date', date('Y-m-d'));
+        $date     = $this->post('date', date('Y-m-d'));
+        $sales_id = (int) $this->post('sales_id');
+
+        if ($sales_id > 0) {
+            $rows = $this->salesModel->lockOne($sales_id);
+            $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked Sales ID:{$sales_id}");
+            $msg = $rows > 0 ? 'Record+locked' : 'Record+already+locked';
+            $this->redirect("/sales?date={$date}&success={$msg}");
+            return;
+        }
 
         $count = $this->salesModel->lockByDate($kiosk_id, $date);
         $this->auditLog->log(Auth::userId(), ACTION_LOCK, "Locked {$count} sales for kiosk:{$kiosk_id} on {$date}");
-
         $this->redirect("/sales?date={$date}&success=Sales+locked+({$count}+records)");
     }
 

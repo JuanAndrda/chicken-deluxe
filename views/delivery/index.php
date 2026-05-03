@@ -216,7 +216,7 @@
                             📤 Record Pullout
                         </button>
                     <?php endif; ?>
-                    <?php if ($is_today && !$any_locked && !empty($deliveries) && Auth::isOwner()): ?>
+                    <?php if ($is_today && !empty($deliveries) && Auth::isOwner() && !empty($any_unlocked)): ?>
                         <form method="POST" action="<?= BASE_URL ?>/delivery/lock"
                               onsubmit="return confirm('Lock all delivery records for today?')">
                             <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
@@ -358,6 +358,20 @@
                                                                     type: 'delete',
                                                                     onConfirm: () => this.closest('form').submit()
                                                                 })">Delete</button>
+                                                    </form>
+                                                    <form method="POST" action="<?= BASE_URL ?>/delivery/lock"
+                                                          class="inline-form">
+                                                        <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                                        <input type="hidden" name="delivery_id" value="<?= $d['Delivery_ID'] ?>">
+                                                        <input type="hidden" name="date" value="<?= $date ?>">
+                                                        <button type="button" class="btn btn-sm btn-primary"
+                                                                onclick="showConfirmModal({
+                                                                    title: 'Lock Record',
+                                                                    message: 'Lock this delivery record? It will become read-only until unlocked.',
+                                                                    confirmText: 'Yes, Lock',
+                                                                    type: 'lock',
+                                                                    onConfirm: () => this.closest('form').submit()
+                                                                })">🔒 Lock</button>
                                                     </form>
                                                 <?php else: ?>
                                                     <form method="POST" action="<?= BASE_URL ?>/delivery/unlock"

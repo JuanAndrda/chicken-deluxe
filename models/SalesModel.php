@@ -128,6 +128,15 @@ class SalesModel extends Model
         );
     }
 
+    /** Lock a single sales record by ID */
+    public function lockOne(int $sales_id): int
+    {
+        return $this->db->write(
+            "UPDATE Sales SET Locked_status = 1 WHERE Sales_ID = ? AND Locked_status = 0",
+            [$sales_id]
+        );
+    }
+
     /** Unlock a sales record (owner only) */
     public function unlock(int $sales_id): int
     {

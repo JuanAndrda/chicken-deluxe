@@ -221,7 +221,19 @@
                                                 })">Unlock</button>
                                     </form>
                                 <?php else: ?>
-                                    <span class="text-light">&mdash;</span>
+                                    <form method="POST" action="<?= BASE_URL ?>/inventory/lock" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                        <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                        <input type="hidden" name="date" value="<?= $date ?>">
+                                        <button type="button" class="btn btn-sm btn-primary"
+                                                onclick="showConfirmModal({
+                                                    title: 'Lock Record',
+                                                    message: 'Lock this inventory record? It will become read-only until unlocked.',
+                                                    confirmText: 'Yes, Lock',
+                                                    type: 'lock',
+                                                    onConfirm: () => this.closest('form').submit()
+                                                })">🔒 Lock</button>
+                                    </form>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
@@ -450,7 +462,19 @@
                                                 })">Unlock</button>
                                     </form>
                                 <?php else: ?>
-                                    <span class="text-light">&mdash;</span>
+                                    <form method="POST" action="<?= BASE_URL ?>/inventory/lock" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                        <input type="hidden" name="inventory_id" value="<?= $row['Inventory_ID'] ?>">
+                                        <input type="hidden" name="date" value="<?= $date ?>">
+                                        <button type="button" class="btn btn-sm btn-primary"
+                                                onclick="showConfirmModal({
+                                                    title: 'Lock Record',
+                                                    message: 'Lock this inventory record? It will become read-only until unlocked.',
+                                                    confirmText: 'Yes, Lock',
+                                                    type: 'lock',
+                                                    onConfirm: () => this.closest('form').submit()
+                                                })">🔒 Lock</button>
+                                    </form>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>

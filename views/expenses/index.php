@@ -103,7 +103,7 @@
                         Total: <strong>P<?= number_format($day_total, 2) ?></strong>
                     </span>
                 </div>
-                <?php if (!empty($expenses) && !$any_locked && $is_today && Auth::isOwner()): ?>
+                <?php if (!empty($expenses) && !empty($any_unlocked) && $is_today && Auth::isOwner()): ?>
                     <form method="POST" action="<?= BASE_URL ?>/expenses/lock" class="inline-form">
                         <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
                         <input type="hidden" name="kiosk_id" value="<?= $kiosk_id ?>">
@@ -177,6 +177,19 @@
                                                         type: 'delete',
                                                         onConfirm: () => this.closest('form').submit()
                                                     })">Delete</button>
+                                        </form>
+                                        <form method="POST" action="<?= BASE_URL ?>/expenses/lock" class="inline-form">
+                                            <input type="hidden" name="csrf_token" value="<?= Auth::generateCsrf() ?>">
+                                            <input type="hidden" name="expense_id" value="<?= $e['Expense_ID'] ?>">
+                                            <input type="hidden" name="date" value="<?= $date ?>">
+                                            <button type="button" class="btn btn-sm btn-primary"
+                                                    onclick="showConfirmModal({
+                                                        title: 'Lock Record',
+                                                        message: 'Lock this expense record? It will become read-only until unlocked.',
+                                                        confirmText: 'Yes, Lock',
+                                                        type: 'lock',
+                                                        onConfirm: () => this.closest('form').submit()
+                                                    })">🔒 Lock</button>
                                         </form>
                                     <?php elseif ($e['Locked_status']): ?>
                                         <form method="POST" action="<?= BASE_URL ?>/expenses/unlock" class="inline-form">

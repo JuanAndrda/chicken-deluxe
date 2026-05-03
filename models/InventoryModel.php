@@ -98,6 +98,15 @@ class InventoryModel extends Model
         );
     }
 
+    /** Lock a single inventory snapshot record by ID (re-lock after edit) */
+    public function lockOne(int $inventory_id): int
+    {
+        return $this->db->write(
+            "UPDATE Inventory_Snapshot SET Locked_status = 1 WHERE Inventory_ID = ? AND Locked_status = 0",
+            [$inventory_id]
+        );
+    }
+
     /** Update quantity on an unlocked record */
     public function updateQuantity(int $inventory_id, int $quantity): int
     {
