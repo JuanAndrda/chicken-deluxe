@@ -518,7 +518,10 @@ class InventoryModel extends Model
                  - COALESCE(po.pulled_out, 0)
                  - COALESCE(consumed.used_qty, 0))   AS Running_Qty
              FROM Part pt
-             INNER JOIN Inventory_Snapshot beg
+             /* LEFT JOIN so newly-added parts still appear in the running
+                inventory widget even before they have a beginning snapshot
+                for today. Beginning_Qty falls back to 0 via COALESCE above. */
+             LEFT JOIN Inventory_Snapshot beg
                     ON beg.Part_ID       = pt.Part_ID
                    AND beg.Kiosk_ID      = ?
                    AND beg.Snapshot_date = ?
